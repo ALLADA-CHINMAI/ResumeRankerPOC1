@@ -1,0 +1,37 @@
+Resume 3: Emily Johnson
+Contact Information:
+emily.johnson@example.com | (555) 123-4567 | LinkedIn: linkedin.com/in/emilyjohnson
+
+Professional Summary
+ServiceNow Developer with 5+ years of experience in IT workflows, catalog development, and platform troubleshooting. Passionate about creating user-friendly solutions and incorporating best practices to optimize IT operations. Background includes experience in both technical and creative roles.
+ 
+
+Technical Skills
+ServiceNow: ITSM, ITOM, ITBM, Employee Center, CMDB
+Languages: JavaScript, HTML, CSS, SQL
+Tools: Git, Postman, Azure, Jenkins
+Irrelevant Skills: Social media marketing, graphic design
+ 
+
+Work Experience
+ServiceNow Developer | GHI Tech Solutions | Mar 2018 – Present
+
+Projects:
+Knowledge Management Module: Redesigned the knowledge base UI to improve search functionality and reduce resolution times.
+Integration Hub Setup: Integrated ServiceNow with external applications, including Slack and Microsoft Teams.
+Troubleshot platform performance issues and implemented preventive measures.
+Marketing Coordinator | JKL Agency | Jan 2015 – Feb 2018
+
+Irrelevant: Managed social media campaigns and designed promotional materials for clients.
+ 
+
+Education
+Bachelor of Science in Computer Science | University of Michigan | 2015
+
+ 
+
+Certifications
+Certified ServiceNow System Administrator (CSA)
+Certified ServiceNow Application Developer (CAD)
+Google Analytics Certification
+ 

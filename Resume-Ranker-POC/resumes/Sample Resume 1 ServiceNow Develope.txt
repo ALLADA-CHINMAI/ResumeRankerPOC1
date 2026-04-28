@@ -1,0 +1,62 @@
+Sample Resume 1: ServiceNow Developer
+ 
+Name: Michael Thompson
+Address: 7890 Willow Drive, Austin, TX
+Phone: (555) 987-6543
+Email: michael.thompson@email.com
+LinkedIn: linkedin.com/in/michaelthompson
+Portfolio: github.com/michaelservicenow
+
+ 
+
+Objective
+Experienced ServiceNow Developer with 7+ years of expertise in designing, customizing, and implementing ServiceNow workflows, modules, and integrations to support IT Service Management (ITSM). Proven ability to optimize business processes and deliver seamless technical solutions.
+ 
+
+Skills
+ServiceNow Platform Expertise: ITSM, ITOM, HRSD, CMDB
+Advanced Scripting: JavaScript, Glide API, Jelly
+Integrations: REST/SOAP APIs, OAuth, MID Servers
+Service Portal Development and Customizations
+Automated Workflows and Service Catalog
+Reporting and Dashboard Creation
+Agile Development Methodologies
+Advanced knowledge of Incident, Problem, and Change Management
+ 
+
+Certifications
+ServiceNow Certified System Administrator
+ServiceNow Certified Application Developer
+ITIL Foundation Certification
+ 
+
+Education
+Bachelor of Science in Computer Science
+University of Texas at Austin | May 2015
+
+ 
+
+Experience
+ServiceNow Developer
+TechWave Solutions | Austin, TX | Jan 2017 – Present
+
+Customized ServiceNow ITSM modules, including Incident, Problem, Change, and Request Management workflows.
+Developed and configured Service Catalogs and Service Portals using JavaScript and HTML.
+Automated workflows using Flow Designer and Glide scripting, reducing manual interventions by 40%.
+Integrated ServiceNow with third-party tools like Salesforce, Jira, and Azure using REST APIs.
+Optimized CMDB processes to improve data accuracy and dependency mapping across services.
+Collaborated with cross-functional teams to gather requirements and deliver tailored ServiceNow solutions.
+Created dynamic dashboards and reports for IT performance monitoring and executive summaries.
+ServiceNow Administrator
+CloudSync Technologies | Austin, TX | June 2015 – Dec 2016
+
+Managed day-to-day administration tasks for the ServiceNow platform, including user access, role assignments, and troubleshooting.
+Configured service request workflows and maintained the platform’s performance through routine updates.
+Supported platform migrations and implemented ITOM modules like Discovery and Event Management.
+Conducted end-user training sessions to improve adoption of ServiceNow features across departments.
+ 
+
+Projects
+Service Portal Redesign: Redesigned Service Portal for end-users by creating a simplified and intuitive UI/UX, resulting in a 25% increase in service request submissions.
+
+Integration with HR Systems: Developed integrations between ServiceNow HRSD and Workday to automate onboarding workflows, saving approximately 15 hours weekly for HR teams.

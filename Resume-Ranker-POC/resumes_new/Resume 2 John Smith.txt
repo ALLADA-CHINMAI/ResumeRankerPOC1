@@ -1,0 +1,40 @@
+Resume 2: John Smith
+Contact Information:
+john.smith@example.com | (321) 654-0987 | LinkedIn: linkedin.com/in/johnsmith | Portfolio: johnsmith.dev
+
+Professional Summary
+Senior ServiceNow Developer with 7+ years of experience specializing in ITSM customization, integrations, and catalog development. Adept at troubleshooting platform performance issues and implementing solutions using ServiceNow best practices. Recognized for strong leadership, communication, and collaboration skills.
+ 
+
+Technical Skills
+ServiceNow: ITSM, ITOM, ITBM, Service Portal, Flow Designer
+Programming Skills: JavaScript, Python (advanced), AngularJS, JSON, XML
+Database Management: MySQL, PostgreSQL
+Tools: JIRA, Jenkins, Azure DevOps
+Irrelevant Skills: Photography, video editing
+ 
+
+Work Experience
+ServiceNow Consultant | DEF IT Solutions | Feb 2017 – Present
+
+Projects:
+Incident Management Automation: Automated ticket routing and escalation workflows using Flow Designer, reducing manual effort by 50%.
+Custom Reporting Dashboards: Designed and implemented analytics dashboards in ITSM, providing real-time insights for business stakeholders.
+Conducted technical spikes to evaluate solutions for integrating third-party tools with ServiceNow.
+Provided high-level estimations and breakdowns for epics and stories during sprint planning.
+Web Developer | LMN Digital | Jan 2014 – Jan 2017
+
+Developed custom web applications using JavaScript and AngularJS.
+Irrelevant Task: Managed client photography projects for promotional campaigns.
+ 
+
+Education
+Bachelor of Science in Information Technology | University of Texas | 2013
+
+ 
+
+Certifications
+Certified ServiceNow System Administrator (CSA)
+Certified ServiceNow Application Developer (CAD)
+AWS Certified Solutions Architect
+ 

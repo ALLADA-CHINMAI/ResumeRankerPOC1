@@ -1,0 +1,42 @@
+Resume 1: Jane Doe
+Contact Information:
+jane.doe@example.com | (123) 456-7890 | LinkedIn: linkedin.com/in/janedoe | GitHub: github.com/janedoe
+
+Professional Summary
+Certified Senior ServiceNow Developer with 8+ years of experience delivering enterprise-level solutions on the ServiceNow platform. Proficient in ITSM, ITOM, and catalog development, with a strong focus on scripting, integrations, and user experience enhancement. An adaptable team player with expertise in agile methodologies, mentoring junior developers, and handling complex workflows.
+ 
+
+Technical Skills
+ServiceNow: ITSM, ITOM, CMDB, Employee Center, Service Portal, Knowledge Management
+Scripting Languages: JavaScript, AngularJS, HTML/CSS, Python (basic)
+Integrations: REST/SOAP APIs, Integration Hub, custom data imports
+Tools: JIRA, Git, Jenkins, Postman
+Irrelevant Skills: Event planning, graphic design
+ 
+
+Work Experience
+Senior ServiceNow Developer | ABC Tech Solutions | Jan 2016 – Present
+
+Projects:
+Employee Center Portal: Designed and launched an employee self-service portal, improving engagement by 30%.
+Integration with Salesforce: Led the development of REST API integrations between ServiceNow and Salesforce CRM, enabling seamless data flow and synchronization.
+Achievements:
+Reduced incident resolution times by 40% through optimized ITSM workflows and automation.
+Delivered 100+ dashboards and reports to track performance metrics across departments.
+Provided technical mentorship to junior developers, conducting code reviews and workshops.
+IT Analyst | XYZ Corp | Mar 2013 – Dec 2015
+
+Managed ServiceNow platform upgrades and implementations while supporting troubleshooting efforts.
+Collaborated with cross-functional teams to align IT goals with business priorities.
+Irrelevant Task: Created graphic design templates for internal presentations.
+ 
+
+Education
+Bachelor of Science in Computer Science | University of California | 2013
+
+ 
+
+Certifications
+Certified ServiceNow System Administrator (CSA)
+Certified ServiceNow Application Developer (CAD)
+Irrelevant: Certified Scrum Master

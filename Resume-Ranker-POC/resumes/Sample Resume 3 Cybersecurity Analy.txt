@@ -1,0 +1,54 @@
+Sample Resume 3: Cybersecurity Analyst
+ 
+Name: Priya Patel
+Address: 9101 Oak Avenue, San Francisco, CA
+Phone: (555) 789-3210
+Email: priya.patel@email.com
+LinkedIn: linkedin.com/in/priyapatel
+Portfolio: priyacybersecurity.io
+
+Objective
+Dedicated cybersecurity analyst with proven expertise in threat detection and vulnerability assessment. Seeking to safeguard corporate assets by implementing advanced security solutions.
+ 
+
+Skills
+Penetration Testing & Vulnerability Assessment
+Incident Response & Threat Intelligence
+Security Tools: Wireshark, Nessus, Splunk, Kali Linux
+Network Security & Encryption Protocols
+Strong understanding of SOC (Security Operations Center) methodologies
+ 
+
+Education
+Master’s in Cybersecurity
+Stanford University | June 2020
+
+Bachelor of Technology (B.Tech) in Computer Science
+University of California – Berkeley | May 2018
+
+ 
+
+Experience
+Cybersecurity Analyst
+SecureTech Corp | San Francisco, CA | July 2020 – Present
+
+Conducted regular vulnerability scans and penetration testing, leading to a 40% reduction in security risks.
+Monitored network traffic using Splunk and identified anomalous activities.
+Collaborated with IT teams to implement multi-factor authentication and encryption protocols.
+Prepared detailed security reports and presented findings to stakeholders.
+Cybersecurity Intern
+SafeNet Solutions | San Francisco, CA | Jan 2020 – June 2020
+
+Assisted in developing incident response strategies for ransomware attacks.
+Participated in risk assessments for new infrastructure projects.
+Created educational materials for staff on cybersecurity best practices.
+ 
+
+Certifications
+CISSP (Certified Information Systems Security Professional)
+CEH (Certified Ethical Hacker)
+ 
+
+Achievements
+Successfully mitigated a phishing attack targeting over 500 employees.
+Designed an incident response plan adopted company-wide.

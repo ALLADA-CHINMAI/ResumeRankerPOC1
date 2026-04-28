@@ -1,0 +1,30 @@
+John Doe
+Senior ServiceNow Developer
+Email: john.doe@example.com | Phone: +1-234-567-8901
+
+Professional Summary
+ServiceNow Developer with 5 years of experience and certifications in CSA and CAD. Skilled in developing applications and modules on the ServiceNow platform.
+
+Professional Experience
+Senior ServiceNow Developer
+XYZ Corporation | Jan 2020 - Present
+- Developed applications using agile methodologies.
+- Collaborated with stakeholders.
+- Troubleshot issues.
+
+ServiceNow Developer
+ABC Inc. | Jan 2015 - Dec 2019
+- Developed workflows in ITSM, ITOM, and ITAM applications.
+- Created prototypes.
+
+Education
+Bachelor of Science in Computer Science
+University of Technology | 2010 - 2014
+
+Certifications
+Certified System Administrator (CSA)
+Certified Application Developer (CAD)
+
+Skills
+ServiceNow Scripting (JavaScript, AngularJS, HTML, CSS, XML, JSON)
+ITSM, ITOM, ITAM Applications

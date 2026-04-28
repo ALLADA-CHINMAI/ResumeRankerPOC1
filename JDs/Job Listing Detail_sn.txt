@@ -1,0 +1,53 @@
+Job Listing Detail
+Summary:
+
+The Senior ServiceNow Developer is responsible for creating and maintaining various applications and modules on the ServiceNow platform. The developer will work with business stakeholders to understand their needs and deliver solutions that improve efficiency and user experience. The developer will also use best practices and agile methodologies to ensure high-quality code and documentation.
+
+ 
+
+Responsibilities:
+
+- Design, develop, test, and deploy applications and modules on the ServiceNow platform using best practices and agile methodologies.
+
+- Collaborate with business stakeholders to gather, analyze, and validate requirements and provide solutions that align with the business goals and objectives.
+
+- Troubleshoot and resolve issues related to the performance, functionality, and security of the ServiceNow applications and modules and implement preventive measures to avoid future incidents.
+
+- Provide technical guidance and mentorship to junior developers and support staff and conduct code reviews and quality assurance checks.
+
+- Stay updated on the latest features and developments of the ServiceNow platform and incorporate them into the existing and new solutions following the ServiceNow best practices and standards.
+
+- Document the design, development, testing, and deployment processes for ServiceNow applications and modules and maintain the configuration management and version control of the code and scripts.
+
+- Provide design, planning, implementation, and development support across the ServiceNow platform.
+
+- Advise where out-of-the-box functionality can achieve a desired outcome instead of resorting to customization and provide feedback to stakeholders regarding alternative options and approaches.
+
+- Provide high-level estimations and guidance for the breakdown of work into features, epics, and stories, including identifying the need for technical spikes.
+
+- Create working demos and prototypes as necessary prior to full deployment.
+
+- Review existing implementations and provide recommendations and support for design changes to enhance platform operations and performance.
+
+ 
+
+Qualifications:
+
+- A CSA (Certified System Administrator) and CAD (Certified Application Developer) certification from ServiceNow.
+
+- At least 5 years of experience in developing solutions on the ServiceNow platform with broad exposure to different modules and applications.
+
+- Experience with scripting in ServiceNow (Business Rules, UI Pages, UI Macros, etc.).
+
+- Strong experience developing forms, reports, dashboards, and complex workflows in the ITSM, ITOM, and ITAM applications.
+
+- Familiarity with User Interface design and User Experience concepts.
+
+- Experience with Employee Center and Catalog development.
+
+- Strong knowledge of ServiceNow scripting languages such as JavaScript, AngularJS, HTML, CSS, XML, and JSON.
+
+- Strong communication skills and the ability to interact effectively with clients and stakeholders.
+
+- A strong team player and collaborator mindset with a willingness to share knowledge and learn from others.
+

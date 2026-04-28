@@ -1,0 +1,53 @@
+Sample Resume 2: IT Project Manager
+ 
+Name: Tom Williams
+Address: 5678 Maple Drive, Denver, CO
+Phone: (555) 123-4567
+Email: tom.williams@email.com
+LinkedIn: linkedin.com/in/tomwilliamsPM
+
+Objective
+Experienced IT Project Manager skilled in leading cross-functional teams to deliver high-value solutions. Seeking to leverage project management expertise to drive strategic IT projects successfully.
+ 
+
+Skills
+Project Management Tools: Jira, Trello, Asana
+Methodologies: Agile, Waterfall
+IT Infrastructure: Cloud Computing, Networking, Cybersecurity
+Budgeting and Risk Management
+Vendor and Stakeholder Management
+ 
+
+Education
+Master of Business Administration (MBA)
+University of Colorado | May 2019
+
+Bachelor’s in Information Technology
+Colorado State University | June 2016
+
+ 
+
+Experience
+IT Project Manager
+SkyTech Solutions | Denver, CO | August 2019 – Present
+
+Led multiple IT projects, resulting in a 15% improvement in operational efficiency.
+Managed large-scale software development teams using Agile methodology, ensuring timely delivery.
+Oversaw project budgets averaging $2 million annually while maintaining cost control.
+Communicated progress and risks effectively with stakeholders, ensuring alignment with goals.
+Business Analyst
+DataCorp Enterprises | Denver, CO | July 2016 – July 2019
+
+Analyzed business requirements and created detailed specifications for IT development projects.
+Served as a liaison between business teams and technical teams to ensure project success.
+Improved reporting methods, saving the team over 200 work hours per quarter.
+ 
+
+Certifications
+PMP (Project Management Professional)
+Certified Scrum Master (CSM)
+ 
+
+Achievements
+Recognized for leadership in delivering an IT transformation project 3 months ahead of schedule.
+Spearheaded the migration of legacy systems to a cloud-based infrastructure.
