@@ -1,9 +1,9 @@
 streamlit
+python-dotenv
 azure-storage-blob
-azure-search-documents
+azure-search-documents>=11.4.0
 azure-core
 openai
-tabulate
 pandas
 python-docx
 pdfplumber
