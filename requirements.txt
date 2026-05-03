@@ -3,6 +3,7 @@ python-dotenv
 azure-storage-blob
 azure-search-documents>=11.4.0
 azure-core
+azure-identity
 openai
 pandas
 python-docx

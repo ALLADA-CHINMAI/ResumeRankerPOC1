@@ -1,10 +1,12 @@
 import os
 import json
 import logging
+import time
 
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
+from azure.identity import ClientSecretCredential
 from azure.storage.blob import BlobServiceClient
 from openai import AzureOpenAI
 
@@ -21,6 +23,12 @@ OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
 OPENAI_DEPLOYMENT = os.getenv("OPENAI_DEPLOYMENT_NAME", "gpt-4o")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_DEPLOYMENT = os.getenv("EMBEDINGS_OPENAI_DEPLOYMENT_NAME", "text-embedding-ada-002")
+OPENAI_API_VERSION = os.getenv("OPENAI_API_VERSION", "2025-01-01-preview")
+
+AUTH_TENANT_ID = os.getenv("AUTH_TENANT_ID")
+AUTH_CLIENT_ID = os.getenv("AUTH_CLIENT_ID")
+AUTH_CLIENT_SECRET = os.getenv("AUTH_CLIENT_SECRET")
+AUTH_SCOPE = os.getenv("AUTH_SCOPE")
 
 SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
@@ -30,17 +38,109 @@ STORAGE_CONN_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 RESUME_CONTAINER = os.getenv("RESUME_CONTAINER_NAME", "resumes")
 JD_CONTAINER = os.getenv("JD_CONTAINER_NAME", "jds")
 
+_credential = None
+_token_cache = {"token": None, "expires_at": 0}
+_openai_client = None
+
+
+def _use_aad_auth() -> bool:
+    return all([AUTH_TENANT_ID, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, AUTH_SCOPE])
+
+
+def _validate_openai_config():
+    if not OPENAI_ENDPOINT:
+        raise ValueError("OPENAI_ENDPOINT is required.")
+    if _use_aad_auth():
+        if not OPENAI_API_KEY:
+            raise ValueError(
+                "OPENAI_API_KEY is required when using the APIM endpoint with Azure AD auth."
+            )
+        return
+    if not OPENAI_API_KEY:
+        raise ValueError(
+            "OPENAI_API_KEY is required unless Azure AD auth is fully configured."
+        )
+
+
+def _get_credential() -> ClientSecretCredential:
+    global _credential
+    if _credential is None:
+        _credential = ClientSecretCredential(
+            tenant_id=AUTH_TENANT_ID,
+            client_id=AUTH_CLIENT_ID,
+            client_secret=AUTH_CLIENT_SECRET,
+        )
+    return _credential
+
+
+def _get_token() -> str:
+    global _token_cache
+
+    if _token_cache["token"] and time.time() < (_token_cache["expires_at"] - 300):
+        return _token_cache["token"]
+
+    credential = _get_credential()
+    token_result = credential.get_token(AUTH_SCOPE)
+    _token_cache["token"] = token_result.token
+    _token_cache["expires_at"] = token_result.expires_on
+    logging.info("Acquired Azure AD token for Azure OpenAI; expires at %s", token_result.expires_on)
+    return token_result.token
+
+
+def _create_openai_client() -> AzureOpenAI:
+    kwargs = {
+        "azure_endpoint": OPENAI_ENDPOINT,
+        "api_version": OPENAI_API_VERSION,
+    }
+    if OPENAI_API_KEY:
+        kwargs["api_key"] = OPENAI_API_KEY
+    if _use_aad_auth():
+        kwargs["default_headers"] = {"Authorization": f"Bearer {_get_token()}"}
+    return AzureOpenAI(**kwargs)
+
+
+def _get_openai_client() -> AzureOpenAI:
+    global _openai_client
+
+    if _openai_client is None:
+        _openai_client = _create_openai_client()
+        return _openai_client
+
+    if _use_aad_auth() and time.time() >= (_token_cache["expires_at"] - 300):
+        logging.info("Refreshing Azure OpenAI client with a fresh Azure AD token.")
+        _openai_client = _create_openai_client()
+
+    return _openai_client
+
+
+class _OpenAIEmbeddingsProxy:
+    def create(self, *args, **kwargs):
+        return _get_openai_client().embeddings.create(*args, **kwargs)
+
+
+class _OpenAIChatCompletionsProxy:
+    def create(self, *args, **kwargs):
+        return _get_openai_client().chat.completions.create(*args, **kwargs)
+
+
+class _OpenAIChatProxy:
+    def __init__(self):
+        self.completions = _OpenAIChatCompletionsProxy()
+
+
+class RefreshingAzureOpenAI:
+    def __init__(self):
+        self.chat = _OpenAIChatProxy()
+        self.embeddings = _OpenAIEmbeddingsProxy()
+
 # ---------------------------------------------------------------------------
 # Clients (cached for the Streamlit session)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource
 def init_clients():
-    openai = AzureOpenAI(
-        azure_endpoint=OPENAI_ENDPOINT,
-        api_key=OPENAI_API_KEY,
-        api_version="2025-01-01-preview",
-    )
+    _validate_openai_config()
+    openai = RefreshingAzureOpenAI()
     blob = BlobServiceClient.from_connection_string(STORAGE_CONN_STR)
     search = ResumeSearchClient(
         endpoint=SEARCH_ENDPOINT,

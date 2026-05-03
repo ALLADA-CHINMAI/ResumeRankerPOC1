@@ -70,6 +70,7 @@ OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 OPENAI_DEPLOYMENT_NAME=gpt-4o
 OPENAI_API_KEY=your-openai-api-key
 EMBEDINGS_OPENAI_DEPLOYMENT_NAME=text-embedding-ada-002
+OPENAI_API_VERSION=2025-01-01-preview
 
 AZURE_SEARCH_ENDPOINT=https://your-service.search.windows.net
 AZURE_SEARCH_API_KEY=your-search-admin-key
@@ -86,9 +87,12 @@ Where to find each value:
 |---|---|
 | `OPENAI_ENDPOINT` | OpenAI resource → Overview → Endpoint |
 | `OPENAI_API_KEY` | OpenAI resource → Keys and Endpoint → KEY 1 |
+| `OPENAI_API_VERSION` | Usually keep the default unless your gateway requires a different preview version |
 | `AZURE_SEARCH_ENDPOINT` | AI Search service → Overview → Url |
 | `AZURE_SEARCH_API_KEY` | AI Search service → Keys → Primary admin key |
 | `AZURE_STORAGE_CONNECTION_STRING` | Storage account → Access keys → Connection string (key1) |
+
+If your organization fronts Azure OpenAI with API Management and requires Azure AD, set `AUTH_TENANT_ID`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, and `AUTH_SCOPE`. In that mode, the app sends both the subscription key and a bearer token and refreshes the token automatically before expiry.
 
 ### 5. Create blob containers (once)
 
@@ -168,6 +172,11 @@ Free tier Azure Cognitive Search does not support vector search. Use Basic or hi
 - Confirm resumes were uploaded and indexed (green success message in Upload tab)
 - Confirm both blob containers exist
 - Check that `EMBEDINGS_OPENAI_DEPLOYMENT_NAME` in `.env` matches your actual embedding deployment name
+
+**`401 Unauthorized` or `Invalid Azure AD JWT` from Azure OpenAI**
+- If `OPENAI_ENDPOINT` points to an APIM or internal proxy endpoint, configure `AUTH_TENANT_ID`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, and `AUTH_SCOPE`
+- Keep `OPENAI_API_KEY` populated if your gateway expects a subscription key in addition to the bearer token
+- Restart Streamlit after changing `.env` so cached clients are rebuilt with the new auth settings
 
 **`ResourceNotFoundError` on blob operations**
 The `resumes` or `jds` container does not exist — create them as described in Step 5.
