@@ -199,51 +199,57 @@ def extract_jd_keywords(jd_text: str) -> str:
 # LLM: resume scoring
 # ---------------------------------------------------------------------------
 
-_SCORE_SYSTEM = """You are a strict resume evaluator. Score resumes against the job description using the rubrics below.
+_SCORE_SYSTEM = """You are a strict resume evaluator. Score each resume against the job description using the rubrics below.
 
-CALIBRATION — use the full 0–100 range:
-  90–100 : meets every requirement; nothing missing
-  75–89  : meets most requirements; 1-2 minor gaps
-  55–74  : meets core requirements; notable gaps in skills or experience
-  35–54  : partial match; significant gaps or only tangentially related
-  0–34   : mostly unrelated role, domain, or skill set
+CALIBRATION — realistic distribution across a candidate pool:
+  90–100 : exceptional fit; meets EVERY listed requirement with explicit, detailed evidence (rare — top 5% of applicants)
+  75–89  : strong fit; meets most requirements; only 1–2 clearly minor gaps
+  55–74  : moderate fit; meets core requirements but has notable gaps in skills, years, or certifications
+  35–54  : weak fit; missing multiple requirements; only partially relevant experience
+  0–34   : poor fit; largely unrelated role, domain, or skill set
 
-Scoring categories (individual scores must sum to totalScore):
+DIFFERENTIATION RULE:
+- Scores across a pool MUST be meaningfully spread. Most candidates fall in the 55–80 range.
+- Do NOT cluster candidates within 5 points of each other unless their resumes are genuinely near-identical.
+- Reserve 90+ strictly for candidates who satisfy every requirement with clear written evidence.
+- A candidate missing even one required certification, skill, or year of experience CANNOT score 90+.
 
-  experience — 25 pts
+Scoring categories — scores MUST exactly sum to totalScore; NEVER exceed the listed maximum:
+
+  experience — MAX 25 pts
     25 : meets or exceeds required years in the exact platform/domain with rich, relevant bullet points
     18 : meets years but bullets are thin, OR slightly under required years with strong detail
     10 : 2–4 yrs relevant experience, or 5+ yrs in a related but different domain
      4 : under 2 yrs relevant, or experience is vaguely described
      0 : no relevant experience
 
-  technicalSkills — 30 pts
+  technicalSkills — MAX 30 pts
     28–30 : explicitly lists ≥80% of required skills/tools with demonstrated use
     20–27 : lists 50–79% of required skills
     10–19 : lists 25–49% of required skills
      1–9  : lists <25% of required skills
      0    : no relevant technical skills
 
-  certifications — 15 pts
+  certifications — MAX 15 pts
     15 : all certifications explicitly required by the JD are present
      8 : some but not all required certifications; or equivalent certifications
      3 : certifications exist but none match what the JD requires
      0 : no certifications at all
 
-  education — 10 pts
+  education — MAX 10 pts
     10 : degree in a directly relevant field (CS, IT, Engineering)
      7 : degree in a related field
      4 : any bachelor's degree
      1 : no degree or unrelated education
      0 : education not mentioned
 
-  location — 10 pts
+  location — MAX 10 pts
     10 : location explicitly matches the JD location
      6 : states open to relocation or remote
      3 : location mentioned but does not match; or location not stated
      0 : explicitly states cannot relocate when JD requires it
 
-  domainFit — 10 pts
+  domainFit — MAX 10 pts
     10 : entire career is in the exact industry/platform the JD targets
      7 : mostly in the right domain with minor detours
      4 : partially in the domain; mixed background
@@ -251,31 +257,59 @@ Scoring categories (individual scores must sum to totalScore):
      0 : completely different industry or domain
 
 Rules:
+- HARD CAP: A category score may NEVER exceed its listed maximum. 11/10 or 16/15 are invalid and will be rejected.
 - Score ONLY on what is explicitly written in the resume. Never infer or assume.
+- For every category where the candidate did NOT receive the maximum, the scoringReason MUST state specifically what was missing or insufficient (e.g. "JD requires 5 yrs AWS Lambda; resume shows 3 yrs general cloud").
 - Only count semantically equivalent terms for clearly synonymous titles/tools (e.g. "ML engineer" ≈ "machine learning developer"). Do NOT stretch equivalence.
 - Deduct heavily when the JD lists a specific required certification and the resume does not have it.
 - If the content is clearly not a resume, return {"totalScore": -2}.
 
 Return ONLY valid JSON, no markdown fences:
 {
-  "totalScore": 85.0,
+  "totalScore": 66.0,
   "scores": {
-    "experience": 22,
-    "technicalSkills": 28,
-    "certifications": 12,
-    "education": 8,
-    "location": 7,
-    "domainFit": 8
+    "experience": 18,
+    "technicalSkills": 20,
+    "certifications": 8,
+    "education": 7,
+    "location": 6,
+    "domainFit": 7
   },
   "scoringReasons": {
-    "experience": "brief reason",
-    "technicalSkills": "brief reason",
-    "certifications": "brief reason",
-    "education": "brief reason",
-    "location": "brief reason",
-    "domainFit": "brief reason"
+    "experience": "Lists 4 years in cloud but JD requires 6 years with specific AWS Lambda expertise; Lambda not mentioned",
+    "technicalSkills": "Has Python, SQL, Docker — missing Kubernetes and Terraform which the JD explicitly requires",
+    "certifications": "Holds AWS Solutions Architect but JD also requires Azure Administrator; Azure cert absent",
+    "education": "BS in Information Systems — related but not a core CS/Engineering degree",
+    "location": "Resume shows Chicago; JD requires Austin TX with no remote option stated",
+    "domainFit": "Fintech background is relevant but 2 of 5 roles are in unrelated retail domain"
   }
 }"""
+
+
+_SCORE_MAX = {
+    "experience": 25,
+    "technicalSkills": 30,
+    "certifications": 15,
+    "education": 10,
+    "location": 10,
+    "domainFit": 10,
+}
+
+
+def _scores_valid(result: dict) -> bool:
+    """Return True only if every category is within its cap and sum matches totalScore."""
+    scores = result.get("scores", {})
+    for key, cap in _SCORE_MAX.items():
+        val = scores.get(key)
+        if val is None or not (0 <= float(val) <= cap):
+            logging.warning(f"Invalid score for '{key}': {val} (max {cap})")
+            return False
+    computed = sum(float(scores[k]) for k in _SCORE_MAX)
+    total = float(result.get("totalScore", -1))
+    if abs(total - computed) > 1:
+        logging.warning(f"totalScore {total} does not match sum {computed}")
+        return False
+    return True
 
 
 def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> dict | None:
@@ -293,7 +327,7 @@ def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> dict | Non
                         ),
                     },
                 ],
-                max_tokens=800,
+                max_tokens=1000,
                 temperature=0,
                 response_format={"type": "json_object"},
             )
@@ -301,8 +335,9 @@ def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> dict | Non
             total = float(result.get("totalScore", -1))
             if total == -2:
                 return None  # not a resume
-            if 0 <= total <= 100:
+            if 0 <= total <= 100 and _scores_valid(result):
                 return result
+            logging.warning(f"Score attempt {attempt + 1} returned invalid result, retrying.")
         except Exception as e:
             logging.warning(f"Score attempt {attempt + 1} failed: {e}")
     return None
@@ -311,15 +346,6 @@ def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> dict | Non
 # ---------------------------------------------------------------------------
 # Ranking pipeline
 # ---------------------------------------------------------------------------
-
-_SCORE_META = {
-    "experience": 25,
-    "technicalSkills": 30,
-    "certifications": 15,
-    "education": 10,
-    "location": 10,
-    "domainFit": 10,
-}
 
 
 def rank_resumes(jd_text: str, top_n: int = 10) -> list[dict]:
@@ -477,8 +503,8 @@ with rank_tab:
                     with st.expander(
                         f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"
                     ):
-                        cols = st.columns(len(_SCORE_META))
-                        for col, (key, max_pts) in zip(cols, _SCORE_META.items()):
+                        cols = st.columns(len(_SCORE_MAX))
+                        for col, (key, max_pts) in zip(cols, _SCORE_MAX.items()):
                             val = r["scores"].get(key, 0)
                             label = (
                                 key.replace("technicalSkills", "Tech Skills")
@@ -491,7 +517,7 @@ with rank_tab:
                             col.metric(label=label, value=f"{val} / {max_pts}")
 
                         st.markdown("**Scoring Reasons:**")
-                        for key in _SCORE_META:
+                        for key in _SCORE_MAX:
                             reason = r["reasons"].get(key, "")
                             if reason:
                                 st.markdown(f"- **{key}**: {reason}")
