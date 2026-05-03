@@ -329,24 +329,20 @@ def rank_resumes(jd_text: str, top_n: int = 10) -> list[dict]:
     with st.status("Step 2/3 — Hybrid search across indexed resumes…", expanded=False):
         chunks = search_client.hybrid_search(keywords, top=60)
 
-    # Group chunks by resume, concatenate text, keep max search score
-    grouped: dict[str, dict] = {}
-    for c in chunks:
-        key = c["resume_name"]
-        if key not in grouped:
-            grouped[key] = {"text": "", "search_score": 0.0}
-        grouped[key]["text"] += "\n\n" + c["chunk_text"]
-        grouped[key]["search_score"] = max(grouped[key]["search_score"], c["search_score"])
+    # Discover unique candidate resumes from search results
+    candidates: list[str] = list(dict.fromkeys(c["resume_name"] for c in chunks))
 
-    if not grouped:
+    if not candidates:
         return []
 
     ranked = []
-    total = len(grouped)
+    total = len(candidates)
     with st.status(f"Step 3/3 — Scoring {total} resume(s) with GPT-4o…", expanded=True) as status:
-        for i, (name, data) in enumerate(grouped.items()):
+        for i, name in enumerate(candidates):
             status.update(label=f"Step 3/3 — Scoring {name}  ({i + 1}/{total})")
-            result = score_resume(jd_text, data["text"])
+            # Fetch full document in section order — no dropout, no scrambling
+            resume_text = search_client.get_resume_text(name)
+            result = score_resume(jd_text, resume_text)
             if result is not None:
                 ranked.append(
                     {
