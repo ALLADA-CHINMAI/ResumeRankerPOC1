@@ -99,19 +99,61 @@ def extract_jd_keywords(jd_text: str) -> str:
 # LLM: resume scoring
 # ---------------------------------------------------------------------------
 
-_SCORE_SYSTEM = """You evaluate resumes against job descriptions.
+_SCORE_SYSTEM = """You are a strict resume evaluator. Score resumes against the job description using the rubrics below.
 
-Scoring criteria (points must sum to totalScore, max 100):
-  experience      — 25 pts  (relevance and length of work history)
-  technicalSkills — 30 pts  (match on required skills and technologies)
-  certifications  — 15 pts  (relevant certifications and training)
-  education       — 10 pts  (degree relevance and level)
-  location        — 10 pts  (location match or stated willingness to relocate)
-  domainFit       — 10 pts  (industry / domain alignment)
+CALIBRATION — use the full 0–100 range:
+  90–100 : meets every requirement; nothing missing
+  75–89  : meets most requirements; 1-2 minor gaps
+  55–74  : meets core requirements; notable gaps in skills or experience
+  35–54  : partial match; significant gaps or only tangentially related
+  0–34   : mostly unrelated role, domain, or skill set
+
+Scoring categories (individual scores must sum to totalScore):
+
+  experience — 25 pts
+    25 : meets or exceeds required years in the exact platform/domain with rich, relevant bullet points
+    18 : meets years but bullets are thin, OR slightly under required years with strong detail
+    10 : 2–4 yrs relevant experience, or 5+ yrs in a related but different domain
+     4 : under 2 yrs relevant, or experience is vaguely described
+     0 : no relevant experience
+
+  technicalSkills — 30 pts
+    28–30 : explicitly lists ≥80% of required skills/tools with demonstrated use
+    20–27 : lists 50–79% of required skills
+    10–19 : lists 25–49% of required skills
+     1–9  : lists <25% of required skills
+     0    : no relevant technical skills
+
+  certifications — 15 pts
+    15 : all certifications explicitly required by the JD are present
+     8 : some but not all required certifications; or equivalent certifications
+     3 : certifications exist but none match what the JD requires
+     0 : no certifications at all
+
+  education — 10 pts
+    10 : degree in a directly relevant field (CS, IT, Engineering)
+     7 : degree in a related field
+     4 : any bachelor's degree
+     1 : no degree or unrelated education
+     0 : education not mentioned
+
+  location — 10 pts
+    10 : location explicitly matches the JD location
+     6 : states open to relocation or remote
+     3 : location mentioned but does not match; or location not stated
+     0 : explicitly states cannot relocate when JD requires it
+
+  domainFit — 10 pts
+    10 : entire career is in the exact industry/platform the JD targets
+     7 : mostly in the right domain with minor detours
+     4 : partially in the domain; mixed background
+     1 : adjacent domain with transferable skills
+     0 : completely different industry or domain
 
 Rules:
-- Score ONLY on what is explicitly written in the resume. Never assume.
-- Understand semantics — semantically equivalent terms count (e.g. "ML engineer" ≈ "machine learning developer").
+- Score ONLY on what is explicitly written in the resume. Never infer or assume.
+- Only count semantically equivalent terms for clearly synonymous titles/tools (e.g. "ML engineer" ≈ "machine learning developer"). Do NOT stretch equivalence.
+- Deduct heavily when the JD lists a specific required certification and the resume does not have it.
 - If the content is clearly not a resume, return {"totalScore": -2}.
 
 Return ONLY valid JSON, no markdown fences:
