@@ -22,109 +22,27 @@ logger = logging.getLogger(__name__)
 # Scoring rubric (prompt + category caps)
 # ---------------------------------------------------------------------------
 
-_SCORE_SYSTEM = """You are a strict resume evaluator. Follow these two steps exactly.
 
-STEP 1 — GAP ANALYSIS (do this before assigning any numbers):
-  a) List the 6–8 most important requirements from the JD (required years, must-have skills, certifications, education, location, domain).
-  b) For each requirement, find the exact text in the resume that addresses it — or write "NOT FOUND".
-  c) Tally: fully_met / partially_met / not_found counts.
-  Your scores in Step 2 MUST be consistent with what you found in Step 1.
+_SCORE_SYSTEM = """
+You are an expert resume evaluator. For each resume, score the following categories, using only the information in the job description and the resume:
 
-STEP 2 — SCORE using the rubric below.
+experience (max 35): Total years and depth of relevant work experience for the job, including how well the candidate's roles and responsibilities match the job description.
+technicalSkills (max 40): Coverage and proficiency in the specific technical skills, tools, languages, or platforms required by the job description.
+certifications (max 5): Presence of any certifications or licenses explicitly required or preferred by the job description.
+education (max 5): Relevance and level of the candidate's educational background compared to the job requirements (degree, field, etc.).
+location (max 5): How well the candidate's stated location or willingness to relocate/remote matches the job's location requirements.
+domainFit (max 10): Alignment of the candidate's career history and industry/domain experience with the target job's field or sector.
 
-CALIBRATION:
-  90–100 : ALL requirements explicitly evidenced — near-perfect fit (top 5% of applicants)
-  75–89  : Most requirements met; only 1–2 minor gaps
-  55–74  : Core requirements met but notable gaps in skills, years, or certifications
-  35–54  : Several requirements unmet; partially relevant experience
-  0–34   : Largely unrelated background
-
-HARD FLOOR RULES — apply unconditionally before assigning scores:
-  • Resume years < JD required years → experience ≤ 18
-  • 2+ required skills absent from resume → technicalSkills ≤ 18
-  • 3+ required skills absent → technicalSkills ≤ 12
-  • Any explicitly required certification absent → certifications ≤ 8
-  • Location not stated or not matching (and no remote/relocation mention) → location ≤ 3
-
-Scoring categories — NEVER exceed the listed maximum; scores MUST sum to totalScore:
-
-  experience — MAX 25 pts
-    25 : meets/exceeds required years in exact domain with specific impactful bullet points
-    18 : meets years but bullets thin, OR slightly under required years with strong detail
-    10 : 2–4 yrs relevant OR 5+ yrs in closely related domain
-     4 : under 2 yrs relevant OR vague descriptions
-     0 : no relevant experience
-
-  technicalSkills — MAX 30 pts
-    28–30 : ≥80% of required skills explicitly listed WITH demonstrated use
-    20–27 : 50–79% of required skills present
-    10–19 : 25–49% of required skills present
-     1–9  : <25% of required skills
-     0    : no relevant technical skills
-
-  certifications — MAX 15 pts
-    15 : ALL explicitly required certs present
-     8 : some required certs present; or strong equivalents
-     3 : certs exist but none match JD requirements
-     0 : no certifications
-
-  education — MAX 10 pts
-    10 : directly relevant degree (CS, IT, Engineering)
-     7 : related field degree
-     4 : any bachelor's degree
-     1 : no degree or unrelated education
-     0 : education not mentioned
-
-  location — MAX 10 pts
-    10 : explicitly matches JD location
-     6 : explicitly states remote OK or open to relocation
-     3 : location not stated or doesn't match JD
-     0 : explicitly states cannot relocate when JD requires on-site
-
-  domainFit — MAX 10 pts
-    10 : entire career in the exact industry/platform the JD targets
-     7 : mostly in the right domain with minor detours
-     4 : partially relevant; mixed background
-     1 : adjacent domain with some transferable skills
-     0 : completely different industry
-
-SCORING REASON RULES:
-- For every category NOT awarded maximum points, the scoringReason MUST:
-  a) Quote the specific requirement from the JD (e.g. "JD requires 5 years AWS Lambda")
-  b) State exactly what the resume says or confirms is absent (e.g. "resume shows '3 years cloud' — Lambda not mentioned")
-- Vague reasons like "some skills missing" are invalid — be specific.
-- Score ONLY on what is explicitly written in the resume. Never infer or assume unstated facts.
-- Only count semantically equivalent terms for clearly synonymous titles/tools (e.g. "ML engineer" ≈ "machine learning developer"). Do NOT stretch equivalence.
-- If the content is clearly not a resume, return {"totalScore": -2}.
-
-Return ONLY valid JSON, no markdown fences:
-{
-  "totalScore": 66.0,
-  "scores": {
-    "experience": 18,
-    "technicalSkills": 20,
-    "certifications": 8,
-    "education": 7,
-    "location": 6,
-    "domainFit": 7
-  },
-  "scoringReasons": {
-    "experience": "JD requires 6 years AWS Lambda; resume states '4 years cloud computing' — Lambda not mentioned",
-    "technicalSkills": "JD requires Kubernetes and Terraform; resume lists Python/SQL/Docker but no Kubernetes or Terraform",
-    "certifications": "JD requires AWS SAA and Azure Administrator; only AWS SAA present — Azure cert absent",
-    "education": "JD prefers CS/Engineering degree; resume shows BS Information Systems",
-    "location": "JD requires Austin TX on-site; resume shows Chicago with no relocation mention",
-    "domainFit": "2 of 5 roles in unrelated retail sector; fintech experience relevant but not consistent throughout career"
-  }
-}"""
+For each category, assign a score from 0 up to the max. Also provide a brief reason for each score. Return valid JSON with totalScore (sum of all categories), a 'scores' object, and a 'scoringReasons' object. Do not include markdown or extra text.
+"""
 
 # Maximum points per category — used for validation and UI display
 SCORE_MAX = {
-    "experience": 25,
-    "technicalSkills": 30,
-    "certifications": 15,
-    "education": 10,
-    "location": 10,
+    "experience": 35,
+    "technicalSkills": 40,
+    "certifications": 5,
+    "education": 5,
+    "location": 5,
     "domainFit": 10,
 }
 
