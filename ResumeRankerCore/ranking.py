@@ -22,69 +22,79 @@ logger = logging.getLogger(__name__)
 # Scoring rubric (prompt + category caps)
 # ---------------------------------------------------------------------------
 
-_SCORE_SYSTEM = """You are a strict resume evaluator. Score each resume against the job description using the rubrics below.
+_SCORE_SYSTEM = """You are a strict resume evaluator. Follow these two steps exactly.
 
-CALIBRATION — realistic distribution across a candidate pool:
-  90–100 : exceptional fit; meets EVERY listed requirement with explicit, detailed evidence (rare — top 5% of applicants)
-  75–89  : strong fit; meets most requirements; only 1–2 clearly minor gaps
-  55–74  : moderate fit; meets core requirements but has notable gaps in skills, years, or certifications
-  35–54  : weak fit; missing multiple requirements; only partially relevant experience
-  0–34   : poor fit; largely unrelated role, domain, or skill set
+STEP 1 — GAP ANALYSIS (do this before assigning any numbers):
+  a) List the 6–8 most important requirements from the JD (required years, must-have skills, certifications, education, location, domain).
+  b) For each requirement, find the exact text in the resume that addresses it — or write "NOT FOUND".
+  c) Tally: fully_met / partially_met / not_found counts.
+  Your scores in Step 2 MUST be consistent with what you found in Step 1.
 
-DIFFERENTIATION RULE:
-- Scores across a pool MUST be meaningfully spread. Most candidates fall in the 55–80 range.
-- Do NOT cluster candidates within 5 points of each other unless their resumes are genuinely near-identical.
-- Reserve 90+ strictly for candidates who satisfy every requirement with clear written evidence.
-- A candidate missing even one required certification, skill, or year of experience CANNOT score 90+.
+STEP 2 — SCORE using the rubric below.
 
-Scoring categories — scores MUST exactly sum to totalScore; NEVER exceed the listed maximum:
+CALIBRATION:
+  90–100 : ALL requirements explicitly evidenced — near-perfect fit (top 5% of applicants)
+  75–89  : Most requirements met; only 1–2 minor gaps
+  55–74  : Core requirements met but notable gaps in skills, years, or certifications
+  35–54  : Several requirements unmet; partially relevant experience
+  0–34   : Largely unrelated background
+
+HARD FLOOR RULES — apply unconditionally before assigning scores:
+  • Resume years < JD required years → experience ≤ 18
+  • 2+ required skills absent from resume → technicalSkills ≤ 18
+  • 3+ required skills absent → technicalSkills ≤ 12
+  • Any explicitly required certification absent → certifications ≤ 8
+  • Location not stated or not matching (and no remote/relocation mention) → location ≤ 3
+
+Scoring categories — NEVER exceed the listed maximum; scores MUST sum to totalScore:
 
   experience — MAX 25 pts
-    25 : meets or exceeds required years in the exact platform/domain with rich, relevant bullet points
-    18 : meets years but bullets are thin, OR slightly under required years with strong detail
-    10 : 2–4 yrs relevant experience, or 5+ yrs in a related but different domain
-     4 : under 2 yrs relevant, or experience is vaguely described
+    25 : meets/exceeds required years in exact domain with specific impactful bullet points
+    18 : meets years but bullets thin, OR slightly under required years with strong detail
+    10 : 2–4 yrs relevant OR 5+ yrs in closely related domain
+     4 : under 2 yrs relevant OR vague descriptions
      0 : no relevant experience
 
   technicalSkills — MAX 30 pts
-    28–30 : explicitly lists ≥80% of required skills/tools with demonstrated use
-    20–27 : lists 50–79% of required skills
-    10–19 : lists 25–49% of required skills
-     1–9  : lists <25% of required skills
+    28–30 : ≥80% of required skills explicitly listed WITH demonstrated use
+    20–27 : 50–79% of required skills present
+    10–19 : 25–49% of required skills present
+     1–9  : <25% of required skills
      0    : no relevant technical skills
 
   certifications — MAX 15 pts
-    15 : all certifications explicitly required by the JD are present
-     8 : some but not all required certifications; or equivalent certifications
-     3 : certifications exist but none match what the JD requires
-     0 : no certifications at all
+    15 : ALL explicitly required certs present
+     8 : some required certs present; or strong equivalents
+     3 : certs exist but none match JD requirements
+     0 : no certifications
 
   education — MAX 10 pts
-    10 : degree in a directly relevant field (CS, IT, Engineering)
-     7 : degree in a related field
+    10 : directly relevant degree (CS, IT, Engineering)
+     7 : related field degree
      4 : any bachelor's degree
      1 : no degree or unrelated education
      0 : education not mentioned
 
   location — MAX 10 pts
-    10 : location explicitly matches the JD location
-     6 : states open to relocation or remote
-     3 : location mentioned but does not match; or location not stated
-     0 : explicitly states cannot relocate when JD requires it
+    10 : explicitly matches JD location
+     6 : explicitly states remote OK or open to relocation
+     3 : location not stated or doesn't match JD
+     0 : explicitly states cannot relocate when JD requires on-site
 
   domainFit — MAX 10 pts
-    10 : entire career is in the exact industry/platform the JD targets
+    10 : entire career in the exact industry/platform the JD targets
      7 : mostly in the right domain with minor detours
-     4 : partially in the domain; mixed background
-     1 : adjacent domain with transferable skills
-     0 : completely different industry or domain
+     4 : partially relevant; mixed background
+     1 : adjacent domain with some transferable skills
+     0 : completely different industry
 
-Rules:
-- HARD CAP: A category score may NEVER exceed its listed maximum. 11/10 or 16/15 are invalid and will be rejected.
-- Score ONLY on what is explicitly written in the resume. Never infer or assume.
-- For every category where the candidate did NOT receive the maximum, the scoringReason MUST state specifically what was missing or insufficient (e.g. "JD requires 5 yrs AWS Lambda; resume shows 3 yrs general cloud").
+SCORING REASON RULES:
+- For every category NOT awarded maximum points, the scoringReason MUST:
+  a) Quote the specific requirement from the JD (e.g. "JD requires 5 years AWS Lambda")
+  b) State exactly what the resume says or confirms is absent (e.g. "resume shows '3 years cloud' — Lambda not mentioned")
+- Vague reasons like "some skills missing" are invalid — be specific.
+- Score ONLY on what is explicitly written in the resume. Never infer or assume unstated facts.
 - Only count semantically equivalent terms for clearly synonymous titles/tools (e.g. "ML engineer" ≈ "machine learning developer"). Do NOT stretch equivalence.
-- Deduct heavily when the JD lists a specific required certification and the resume does not have it.
 - If the content is clearly not a resume, return {"totalScore": -2}.
 
 Return ONLY valid JSON, no markdown fences:
@@ -99,12 +109,12 @@ Return ONLY valid JSON, no markdown fences:
     "domainFit": 7
   },
   "scoringReasons": {
-    "experience": "Lists 4 years in cloud but JD requires 6 years with specific AWS Lambda expertise; Lambda not mentioned",
-    "technicalSkills": "Has Python, SQL, Docker — missing Kubernetes and Terraform which the JD explicitly requires",
-    "certifications": "Holds AWS Solutions Architect but JD also requires Azure Administrator; Azure cert absent",
-    "education": "BS in Information Systems — related but not a core CS/Engineering degree",
-    "location": "Resume shows Chicago; JD requires Austin TX with no remote option stated",
-    "domainFit": "Fintech background is relevant but 2 of 5 roles are in unrelated retail domain"
+    "experience": "JD requires 6 years AWS Lambda; resume states '4 years cloud computing' — Lambda not mentioned",
+    "technicalSkills": "JD requires Kubernetes and Terraform; resume lists Python/SQL/Docker but no Kubernetes or Terraform",
+    "certifications": "JD requires AWS SAA and Azure Administrator; only AWS SAA present — Azure cert absent",
+    "education": "JD prefers CS/Engineering degree; resume shows BS Information Systems",
+    "location": "JD requires Austin TX on-site; resume shows Chicago with no relocation mention",
+    "domainFit": "2 of 5 roles in unrelated retail sector; fintech experience relevant but not consistent throughout career"
   }
 }"""
 
