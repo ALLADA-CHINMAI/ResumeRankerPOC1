@@ -7,7 +7,7 @@ import sys
 import os
 
 # Ensure the project root (parent of ui\) is on sys.path so 'core' is importable.
-# This is needed when Streamlit adds ui\ to sys.path instead of the project root.
+# Needed because Streamlit adds ui\ to sys.path, not the project root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
@@ -29,156 +29,349 @@ from core.ranking import rank_resumes, SCORE_MAX
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# One-time init — validate config and trigger index creation for both indexes
+# Providence Healthcare brand colours
+# ---------------------------------------------------------------------------
+BLUE   = "#00338E"   # primary dark blue
+OLIVE  = "#6B7C3F"   # olive green accent
+WHITE  = "#FFFFFF"
+LIGHT  = "#F4F6FA"   # very light blue-grey background tint
+
+# ---------------------------------------------------------------------------
+# One-time init — validate config and ensure both search indexes exist
 # ---------------------------------------------------------------------------
 
 @st.cache_resource
 def _init():
-    """Validate environment and warm up both search indexes (creates them if missing)."""
     validate_config()
-    resume_search = get_resume_search()   # creates resume_chunks index if it doesn't exist
-    jd_search = get_jd_search()           # creates jd_chunks index if it doesn't exist
+    resume_search = get_resume_search()   # creates resume_chunks index if missing
+    jd_search     = get_jd_search()       # creates jd_chunks index if missing
     return resume_search, jd_search
 
 
 resume_search, jd_search = _init()
 
 # ---------------------------------------------------------------------------
-# UI
+# Global CSS — Providence colours, no red anywhere, dark-blue checkboxes
 # ---------------------------------------------------------------------------
 
-st.set_page_config(page_title="Resume Ranker", layout="wide")
-st.title("Resume Ranker")
+st.set_page_config(page_title="Resume Ranker — Providence", layout="wide")
 
-upload_tab, rank_tab = st.tabs(["Upload", "Rank Resumes"])
+st.markdown(f"""
+<style>
+  /* ── Page background ── */
+  .stApp {{
+      background-color: {LIGHT};
+  }}
 
-# ── Upload tab ──────────────────────────────────────────────────────────────
-with upload_tab:
-    res_col, jd_col = st.columns(2)
+  /* ── Top header bar ── */
+  .ph-header {{
+      background-color: {BLUE};
+      padding: 18px 28px 14px 28px;
+      border-radius: 8px;
+      margin-bottom: 28px;
+  }}
+  .ph-header h1 {{
+      color: {WHITE} !important;
+      margin: 0;
+      font-size: 1.8rem;
+      letter-spacing: 0.3px;
+  }}
+  .ph-header p {{
+      color: #B8CBE8;
+      margin: 4px 0 0 0;
+      font-size: 0.88rem;
+  }}
 
-    with res_col:
-        st.subheader("Resumes")
-        resume_files = st.file_uploader(
-            "Select resume files (.txt, .pdf, .docx)",
-            accept_multiple_files=True,
-            key="resume_uploader",
-        )
-        if st.button("Upload & Index Resumes", disabled=not resume_files):
-            progress = st.progress(0, text="Starting…")
-            errors = []
-            for idx, f in enumerate(resume_files):
-                progress.progress((idx + 0.5) / len(resume_files), text=f"Uploading {f.name}…")
-                data = f.read()
-                try:
-                    # 1. Store original file in blob
-                    upload_blob(RESUME_CONTAINER, f.name, data)
-                    # 2. Extract text, index chunks + cache parsed text for fast ranking
-                    text = extract_text(f.name, data)
-                    if text.strip():
-                        progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
-                        resume_search.index_document(f.name, text)
-                        store_parsed_text(f.name, text)   # cached for O(1) retrieval during ranking
-                    else:
-                        errors.append(f"{f.name}: no text extracted")
-                except Exception as e:
-                    errors.append(f"{f.name}: {e}")
-                progress.progress((idx + 1) / len(resume_files))
-            progress.empty()
-            for err in errors:
-                st.warning(err)
-            st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
+  /* ── Section headings ── */
+  .section-title {{
+      color: {BLUE};
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      border-left: 4px solid {OLIVE};
+      padding-left: 10px;
+      margin-bottom: 12px;
+  }}
 
-    with jd_col:
-        st.subheader("Job Descriptions")
-        jd_files = st.file_uploader(
-            "Select JD files (.txt, .pdf, .docx)",
-            accept_multiple_files=True,
-            key="jd_uploader",
-        )
-        if st.button("Upload & Index JDs", disabled=not jd_files):
-            errors = []
-            for f in jd_files:
-                data = f.read()
-                try:
-                    # 1. Store original file in blob
-                    upload_blob(JD_CONTAINER, f.name, data)
-                    # 2. Extract text and index for future semantic JD search (e.g. via MCP)
-                    text = extract_text(f.name, data)
-                    if text.strip():
-                        jd_search.index_document(f.name, text)
-                    else:
-                        errors.append(f"{f.name}: no text extracted")
-                except Exception as e:
-                    errors.append(f"{f.name}: {e}")
-            for err in errors:
-                st.warning(err)
-            st.success(f"Uploaded and indexed {len(jd_files) - len(errors)} JD(s).")
+  /* ── Divider ── */
+  .ph-divider {{
+      border: none;
+      border-top: 2px solid {BLUE};
+      opacity: 0.18;
+      margin: 28px 0;
+  }}
 
+  /* ── All primary buttons → Providence blue ── */
+  .stButton > button {{
+      background-color: {BLUE} !important;
+      color: {WHITE} !important;
+      border: none !important;
+      border-radius: 5px !important;
+      font-weight: 600 !important;
+      padding: 8px 22px !important;
+      transition: background-color 0.2s;
+  }}
+  .stButton > button:hover {{
+      background-color: #002266 !important;
+  }}
+  .stButton > button:disabled {{
+      background-color: #8BAAD4 !important;
+      cursor: not-allowed !important;
+  }}
 
-# ── Rank tab ─────────────────────────────────────────────────────────────────
-with rank_tab:
-    st.subheader("Rank Resumes Against a Job Description")
+  /* ── Select All / Deselect All helper buttons — olive outline ── */
+  .olive-btn > button {{
+      background-color: transparent !important;
+      color: {OLIVE} !important;
+      border: 1.5px solid {OLIVE} !important;
+      border-radius: 4px !important;
+      font-size: 0.8rem !important;
+      padding: 4px 14px !important;
+      font-weight: 600 !important;
+  }}
+  .olive-btn > button:hover {{
+      background-color: {OLIVE} !important;
+      color: {WHITE} !important;
+  }}
 
-    # Resume multiselect — lets the user target a specific candidate pool
+  /* ── Checkboxes — dark blue accent ── */
+  input[type="checkbox"] {{
+      accent-color: {BLUE} !important;
+      width: 16px !important;
+      height: 16px !important;
+  }}
+
+  /* ── Progress bar — blue ── */
+  .stProgress > div > div > div > div {{
+      background-color: {BLUE} !important;
+  }}
+
+  /* ── st.status / expander border ── */
+  [data-testid="stExpander"] {{
+      border: 1px solid #D0DAF0 !important;
+      border-radius: 6px !important;
+  }}
+
+  /* ── Metric value colour ── */
+  [data-testid="stMetricValue"] {{
+      color: {BLUE} !important;
+  }}
+
+  /* ── Success / info messages — no green/red, use blue ── */
+  .stAlert [data-baseweb="notification"] {{
+      border-left-color: {BLUE} !important;
+  }}
+
+  /* ── Selectbox label ── */
+  .stSelectbox label, .stFileUploader label {{
+      color: #1A1A2E;
+      font-weight: 600;
+  }}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Page header
+# ---------------------------------------------------------------------------
+
+st.markdown(f"""
+<div class="ph-header">
+  <h1>Resume Ranker</h1>
+  <p>Providence Health Care &nbsp;·&nbsp; AI-powered candidate screening</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Section 1 — Upload (two columns, side by side)
+# ---------------------------------------------------------------------------
+
+res_col, jd_col = st.columns(2, gap="large")
+
+with res_col:
+    st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
+    resume_files = st.file_uploader(
+        "Select files (.txt, .pdf, .docx)",
+        accept_multiple_files=True,
+        key="resume_uploader",
+    )
+    if st.button("Upload & Index Resumes", disabled=not resume_files, key="btn_upload_res"):
+        progress = st.progress(0, text="Starting…")
+        errors = []
+        for idx, f in enumerate(resume_files):
+            progress.progress((idx + 0.5) / len(resume_files), text=f"Uploading {f.name}…")
+            data = f.read()
+            try:
+                upload_blob(RESUME_CONTAINER, f.name, data)
+                text = extract_text(f.name, data)
+                if text.strip():
+                    progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
+                    resume_search.index_document(f.name, text)
+                    store_parsed_text(f.name, text)   # cache for fast ranking retrieval
+                else:
+                    errors.append(f"{f.name}: no text extracted")
+            except Exception as e:
+                errors.append(f"{f.name}: {e}")
+            progress.progress((idx + 1) / len(resume_files))
+        progress.empty()
+        for err in errors:
+            st.warning(err)
+        st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
+
+with jd_col:
+    st.markdown('<div class="section-title">Upload New Job Descriptions</div>', unsafe_allow_html=True)
+    jd_files = st.file_uploader(
+        "Select files (.txt, .pdf, .docx)",
+        accept_multiple_files=True,
+        key="jd_uploader",
+    )
+    if st.button("Upload & Index JDs", disabled=not jd_files, key="btn_upload_jd"):
+        errors = []
+        for f in jd_files:
+            data = f.read()
+            try:
+                upload_blob(JD_CONTAINER, f.name, data)
+                text = extract_text(f.name, data)
+                if text.strip():
+                    jd_search.index_document(f.name, text)   # index for future semantic JD search
+                else:
+                    errors.append(f"{f.name}: no text extracted")
+            except Exception as e:
+                errors.append(f"{f.name}: {e}")
+        for err in errors:
+            st.warning(err)
+        st.success(f"Uploaded and indexed {len(jd_files) - len(errors)} JD(s).")
+
+# ---------------------------------------------------------------------------
+# Divider
+# ---------------------------------------------------------------------------
+
+st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Section 2 — Rank Resumes
+# ---------------------------------------------------------------------------
+
+st.markdown('<div class="section-title">Rank Resumes Against a Job Description</div>', unsafe_allow_html=True)
+
+# ── Step 1: JD selection ─────────────────────────────────────────────────
+
+try:
+    jd_list = list_blobs(JD_CONTAINER)
+except Exception as e:
+    jd_list = []
+    st.warning(f"Could not list job descriptions: {e}")
+
+if not jd_list:
+    st.info("No job descriptions found. Upload at least one JD above before ranking.")
+else:
+    selected_jd = st.selectbox("Select a Job Description", jd_list, key="jd_select")
+
+    st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+
+    # ── Step 2: Resume checkboxes ─────────────────────────────────────────
+
+    st.markdown("**Select Resumes to Rank**", unsafe_allow_html=False)
+
     try:
         all_resumes = list_blobs(RESUME_CONTAINER)
     except Exception as e:
         all_resumes = []
-        st.error(f"Could not list resumes: {e}")
+        st.warning(f"Could not list resumes: {e}")
 
-    selected_resumes = st.multiselect(
-        "Select resumes to rank (default: all)",
-        options=all_resumes,
-        default=all_resumes,
-        help="Leave all selected to rank the full candidate pool, or pick a subset.",
-    )
-
-    # JD selection
-    try:
-        jd_list = list_blobs(JD_CONTAINER)
-    except Exception as e:
-        jd_list = []
-        st.error(f"Could not list JDs: {e}")
-
-    if not jd_list:
-        st.info("No job descriptions uploaded yet. Go to the Upload tab first.")
+    if not all_resumes:
+        st.info("No resumes found. Upload resumes above first.")
     else:
-        selected_jd = st.selectbox("Select a Job Description", jd_list)
+        # Initialise checkbox session state — all checked by default
+        for resume in all_resumes:
+            key = f"cb_{resume}"
+            if key not in st.session_state:
+                st.session_state[key] = True
 
-        rank_disabled = not selected_resumes  # disable button if no resumes selected
-        if st.button("Rank Resumes", disabled=rank_disabled):
+        # Select All / Deselect All helper buttons
+        sa_col, da_col, spacer = st.columns([1, 1, 8])
+        with sa_col:
+            st.markdown('<div class="olive-btn">', unsafe_allow_html=True)
+            if st.button("Select All", key="btn_all"):
+                for r in all_resumes:
+                    st.session_state[f"cb_{r}"] = True
+            st.markdown('</div>', unsafe_allow_html=True)
+        with da_col:
+            st.markdown('<div class="olive-btn">', unsafe_allow_html=True)
+            if st.button("Deselect All", key="btn_none"):
+                for r in all_resumes:
+                    st.session_state[f"cb_{r}"] = False
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Scrollable checkbox list (dark blue accent via CSS above)
+        with st.container(height=220, border=True):
+            for resume in all_resumes:
+                st.checkbox(resume, key=f"cb_{resume}")
+
+        # Collect currently selected resumes
+        selected_resumes = [r for r in all_resumes if st.session_state.get(f"cb_{r}", True)]
+        n_selected = len(selected_resumes)
+        st.caption(f"{n_selected} of {len(all_resumes)} resumes selected")
+
+        st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+
+        # ── Step 3: Rank button + live progress ──────────────────────────
+
+        rank_disabled = n_selected == 0
+        if st.button(
+            "Rank Resumes →",
+            disabled=rank_disabled,
+            key="btn_rank",
+            help="Select at least one resume and a JD to begin ranking.",
+        ):
+            # Fetch and extract the selected JD
             try:
                 jd_data = fetch_blob(JD_CONTAINER, selected_jd)
                 jd_text = extract_text(selected_jd, jd_data)
             except Exception as e:
-                st.error(f"Failed to fetch JD: {e}")
+                st.error(f"Failed to load job description: {e}")
                 st.stop()
 
-            # Pass filter only when user selected a strict subset (avoids long OData filter strings)
+            # Only pass an explicit filter when the user selected a strict subset
             filter_resumes = (
                 selected_resumes
                 if set(selected_resumes) != set(all_resumes)
                 else None
             )
 
-            with st.status("Ranking resumes…", expanded=True) as status:
-                results = rank_resumes(jd_text, top_n=10, selected_resumes=filter_resumes)
-                status.update(label="Ranking complete.", state="complete")
+            # Live progress display inside st.status
+            with st.status("Ranking in progress…", expanded=True) as status:
+                log = st.empty()
+                messages: list = []
+
+                def _progress(msg: str):
+                    messages.append(msg)
+                    # Show last 6 messages so the box doesn't grow too tall
+                    log.markdown(
+                        "\n".join(f"→ {m}" for m in messages[-6:])
+                    )
+
+                results = rank_resumes(
+                    jd_text,
+                    top_n=10,
+                    selected_resumes=filter_resumes,
+                    on_progress=_progress,
+                )
+                status.update(label="✓ Ranking complete!", state="complete", expanded=False)
+
+            # ── Results ──────────────────────────────────────────────────
 
             if not results:
-                st.warning(
-                    "No resumes scored. Make sure resumes are uploaded and indexed "
-                    "(check the Upload tab)."
-                )
+                st.warning("No resumes could be scored. Check that resumes are indexed (Upload section above).")
             else:
-                st.success(f"Top {len(results)} resumes for **{selected_jd}**")
+                st.success(f"Top {len(results)} candidates for **{selected_jd}**")
 
                 # Summary table
                 table_rows = [
                     {
-                        "Rank": i + 1,
+                        "Rank":   i + 1,
                         "Resume": r["name"],
-                        "Score": f"{r['total_score']:.1f} / 100",
+                        "Score":  f"{r['total_score']:.1f} / 100",
                     }
                     for i, r in enumerate(results)
                 ]
@@ -188,9 +381,12 @@ with rank_tab:
                     hide_index=True,
                 )
 
-                # Expandable score breakdown cards
-                st.markdown("---")
-                st.subheader("Score Breakdown")
+                # Expandable score breakdown per candidate
+                st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="section-title">Score Breakdown</div>',
+                    unsafe_allow_html=True,
+                )
 
                 for i, r in enumerate(results):
                     with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
