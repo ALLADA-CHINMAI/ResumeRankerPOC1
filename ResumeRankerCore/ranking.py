@@ -13,8 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import List, Optional
 
-from core.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from core.storage import fetch_parsed_text
+from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerCore.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +206,7 @@ def rank_resumes(
     top_n: int = 10,
     selected_resumes: Optional[List[str]] = None,
     search_top: int = 100,
+    on_progress: Optional[callable] = None,
 ) -> List[dict]:
     """
     Rank resumes against a job description.
@@ -222,13 +223,17 @@ def rank_resumes(
         top_n:            Number of results to return (default 10).
         selected_resumes: If provided, only rank these resumes (multiselect support).
         search_top:       How many chunks to retrieve in Stage 1. Increase for larger corpora.
+        on_progress:      Optional callback(message: str) for real-time UI progress updates.
     """
+    _p = on_progress or (lambda msg: None)  # no-op if no callback provided
     resume_search = get_resume_search()
 
     # Stage 1 — keyword extraction + hybrid search
+    _p("Extracting JD keywords…")
     logger.info("Extracting JD keywords (cached if seen before)...")
     keywords = extract_jd_keywords(jd_text)
 
+    _p(f"Searching indexed resumes (top {search_top} chunks)…")
     logger.info("Hybrid search (top=%d, filter=%s)...", search_top, bool(selected_resumes))
     chunks = resume_search.hybrid_search(
         keywords,
@@ -238,6 +243,7 @@ def rank_resumes(
 
     if not chunks:
         logger.warning("Hybrid search returned no results.")
+        _p("No matching resumes found in the index.")
         return []
 
     # Aggregate search scores per resume to identify the strongest candidates
@@ -248,6 +254,7 @@ def rank_resumes(
 
     # Keep only top 25 by aggregated score — this is the coarse filter
     coarse_candidates = sorted(scores_by_resume, key=lambda n: -scores_by_resume[n])[:25]
+    _p(f"Found {len(scores_by_resume)} candidates — scoring top {len(coarse_candidates)} with GPT-4o…")
     logger.info(
         "Coarse filter: %d unique resumes found → top %d forwarded to GPT-4o scoring.",
         len(scores_by_resume),
@@ -275,11 +282,15 @@ def rank_resumes(
         }
 
     ranked: List[dict] = []
+    completed = 0
+    total = len(coarse_candidates)
     # max_workers=8: balances Azure OpenAI TPM limits with parallelism gains
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(_score_one, name): name for name in coarse_candidates}
         for future in as_completed(futures):
             result = future.result()
+            completed += 1
+            _p(f"Scored {completed} / {total} resumes…")
             if result is not None:
                 ranked.append(result)
 

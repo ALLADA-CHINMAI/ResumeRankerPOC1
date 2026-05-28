@@ -9,7 +9,7 @@ import logging
 from typing import List
 
 from dotenv import load_dotenv
-from core.clients import get_blob_service
+from ResumeRankerCore.clients import get_blob_service
 
 load_dotenv()
 logger = logging.getLogger(__name__)

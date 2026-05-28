@@ -180,7 +180,7 @@ def get_resume_search():
     """Return the DocumentSearchClient for the resumes index."""
     global _resume_search_singleton
     if _resume_search_singleton is None:
-        from core.search import DocumentSearchClient  # local import avoids circular dep at module load
+        from ResumeRankerCore.search import DocumentSearchClient  # local import avoids circular dep at module load
         _resume_search_singleton = DocumentSearchClient(
             endpoint=SEARCH_ENDPOINT,
             api_key=SEARCH_API_KEY,
@@ -196,7 +196,7 @@ def get_jd_search():
     """Return the DocumentSearchClient for the JDs index."""
     global _jd_search_singleton
     if _jd_search_singleton is None:
-        from core.search import DocumentSearchClient
+        from ResumeRankerCore.search import DocumentSearchClient
         _jd_search_singleton = DocumentSearchClient(
             endpoint=SEARCH_ENDPOINT,
             api_key=SEARCH_API_KEY,
