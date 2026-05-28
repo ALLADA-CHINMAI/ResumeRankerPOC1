@@ -215,7 +215,7 @@ def rank_resumes(
     jd_text: str,
     top_n: int = 10,
     selected_resumes: Optional[List[str]] = None,
-    search_top: int = 100,
+    search_top: int = 25,
     on_progress: Optional[callable] = None,
 ) -> List[dict]:
     """
@@ -262,8 +262,8 @@ def rank_resumes(
         name = chunk["doc_name"]
         scores_by_resume[name] = scores_by_resume.get(name, 0.0) + chunk["search_score"]
 
-    # Keep only top 25 by aggregated score — this is the coarse filter
-    coarse_candidates = sorted(scores_by_resume, key=lambda n: -scores_by_resume[n])[:25]
+    # Keep only top 15 by aggregated score — this is the coarse filter for GPT-4o
+    coarse_candidates = sorted(scores_by_resume, key=lambda n: -scores_by_resume[n])[:15]
     _p(f"Found {len(scores_by_resume)} candidates — scoring top {len(coarse_candidates)} with GPT-4o…")
     logger.info(
         "Coarse filter: %d unique resumes found → top %d forwarded to GPT-4o scoring.",

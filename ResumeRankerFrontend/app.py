@@ -197,7 +197,7 @@ with st.container():
                 accept_multiple_files=True,
                 key="jd_uploader",
             )
-            if st.button("Upload & Index JDs", disabled=not jd_files, key="btn_upload_jd"):
+            if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
                 errors = []
                 for f in jd_files:
                     data = f.read()
@@ -210,7 +210,8 @@ with st.container():
                             errors.append(f"{f.name}: no text extracted")
                     except Exception as e:
                         errors.append(f"{f.name}: {e}")
-                _list_jds.clear()  # refresh dropdown
+                _list_jds.clear()  # refresh JD dropdown
+                _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
                 for err in errors:
                     st.warning(err)
                 st.success(f"Uploaded and indexed {len(jd_files) - len(errors)} JD(s).")
@@ -240,7 +241,8 @@ with st.container():
                         errors.append(f"{f.name}: {e}")
                     progress.progress((idx + 1) / len(resume_files))
                 progress.empty()
-                _list_resumes.clear()  # refresh checkbox list
+                _list_resumes.clear()  # refresh resume list
+                _list_jds.clear()      # also clear JD cache in case resumes affect downstream logic
                 for err in errors:
                     st.warning(err)
                 st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
