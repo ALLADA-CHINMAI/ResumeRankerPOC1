@@ -214,7 +214,7 @@ with st.container():
                 _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
                 for err in errors:
                     st.warning(err)
-                st.success(f"Uploaded and indexed {len(jd_files) - len(errors)} JD(s).")
+                st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
         with up_col2:
             st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
             resume_files = st.file_uploader(
