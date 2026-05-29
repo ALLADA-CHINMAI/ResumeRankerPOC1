@@ -141,9 +141,9 @@ def rank_resumes(
 
     Two-stage pipeline:
       Stage 1 — hybrid search + search-score aggregation → top 25 candidates (fast, free)
-      Stage 2 — ThreadPoolExecutor with up to 8 parallel GPT-4o scoring calls (capped at 25)
+      Stage 2 — ThreadPoolExecutor with up to 8 parallel GPT-4o scoring calls (capped at 15)
 
-    GPT-4o calls are always capped at ~25 regardless of how many resumes are in the corpus,
+    GPT-4o calls are always capped at ~15 regardless of how many resumes are in the corpus,
     so this stays fast at 1000+ resumes.
 
     Args:
@@ -189,7 +189,7 @@ def rank_resumes(
         len(coarse_candidates),
     )
 
-    # Stage 2 — parallel GPT-4o scoring of top 25
+    # Stage 2 — parallel GPT-4o scoring of top 15
     def _score_one(name: str) -> Optional[dict]:
         try:
             # Prefer the cached parsed-text blob (fast blob read, no index query needed)
