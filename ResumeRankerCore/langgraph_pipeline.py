@@ -19,7 +19,7 @@ from langgraph.graph import StateGraph, END
 
 from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
 from ResumeRankerCore.models import RankingState
-from ResumeRankerCore.sql_skills_client import get_team_skill_profile
+from ResumeRankerCore.csv_skills_client import get_team_skill_profile
 from ResumeRankerCore.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
