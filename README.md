@@ -25,6 +25,11 @@ Resume Ranker is an intelligent resume evaluation system that leverages Azure Op
 
 ### Technical Capabilities
 - **Modular Architecture** — Clean separation between business logic (`ResumeRankerCore`) and presentation layer (`ResumeRankerFrontend`)
+- **MCP Server Integration** — Model Context Protocol server exposes three tools for GitHub Copilot Chat:
+  - `search_resumes` — Hybrid semantic search across indexed resumes
+  - `get_candidate_history` — Retrieve full interview history from Excel datastore
+  - `rerank_candidates` — Azure OpenAI reranking with historical context
+- **Candidate History Tracking** — Excel-based datastore (`candidate_data.xlsx`) maintains candidate metadata and complete interview round history
 - **Enterprise Auth Support** — Azure AD token-based authentication with automatic token refresh for API Management/gateway scenarios
 - **Auto-Scaling** — Parallelized GPT-4o scoring calls via ThreadPoolExecutor; configurable concurrency
 - **Chunking Strategy** — Token-aware text splitting (400 tokens/chunk, 60-token overlap) preserves context across chunk boundaries
@@ -129,7 +134,190 @@ Resume Ranker is an intelligent resume evaluation system that leverages Azure Op
 - Recursive splitting on separators (paragraphs → sentences → hard token splits)
 - LRU-cached encoder for performance
 
-#### 3. **Azure Services Integration**
+---
+
+### Model Context Protocol (MCP) Server
+
+**ResumeRankerMCP** exposes the resume ranking system as an MCP server for integration with GitHub Copilot Chat and other AI assistants.
+
+#### Available Tools
+
+**1. `search_resumes(query: str, top_k: int = 50) -> dict`**
+- Performs hybrid semantic + keyword search across indexed resumes
+- Returns candidates with `doc_name` and `semantic_score`
+- Use `doc_name` values to fetch full candidate history
+
+**2. `get_candidate_history(doc_names: List[str] | candidate_ids: List[str]) -> dict`**
+- Reads `candidate_data.xlsx` (Excel datastore) for complete candidate profiles
+- Returns metadata (name, email, role, years of experience, current company)
+- Returns full interview history across all application rounds:
+  - Interview dates, rounds cleared, scores
+  - Rejection reasons and feedback
+  - Application status and lifecycle state
+- Resolves `doc_name` (from AI Search) → `candidate_id` → history rows
+
+**3. `rerank_candidates(jd: str, candidates: List[Dict]) -> dict`**
+- Accepts merged output from `search_resumes` + `get_candidate_history`
+- Uses Azure OpenAI (GPT-4o) to produce final ranked list
+- Considers semantic match, experience fit, interview history, and recency
+- Returns ranked candidates with scores (0–100) and explanations
+
+#### Excel Datastore Schema
+
+**File:** `candidate_data.xlsx`
+
+**Sheet 1: `candidate_metadata`**
+| Column | Description |
+|--------|-------------|
+| `candidate_id` | Unique identifier |
+| `full_name` | Candidate full name |
+| `primary_email` | Contact email |
+| `role_family` | Job role category |
+| `years_experience` | Total YOE |
+| `current_company` | Current employer |
+| `latest_application_status` | Active/Rejected/Withdrawn |
+| `last_interview_round` | Farthest round reached |
+| `total_applications` | Count of applications |
+| `candidate_status` | Overall lifecycle state |
+| `latest_resume_blob_url` | Link to resume in blob storage |
+| `latest_ai_search_doc_id` | Current resume doc_name in search index |
+
+**Sheet 2: `interview_history`**
+| Column | Description |
+|--------|-------------|
+| `candidate_id` | Reference to candidate_metadata |
+| `application_date` | Date of application |
+| `job_req_id` | Job requisition ID |
+| `position_title` | Applied position |
+| `interview_round` | Round number/name |
+| `interview_date` | Round completion date |
+| `interviewer_name` | Interviewer(s) |
+| `technical_score` | Score for technical assessment |
+| `behavioral_score` | Score for behavioral fit |
+| `overall_feedback` | Text feedback |
+| `rejection_reason` | If rejected, the reason |
+| `round_status` | Passed/Failed/Pending |
+
+#### VS Code Configuration
+
+Add to `.vscode/settings.json`:
+
+```json
+{
+  "github.copilot.chat.mcp.servers": {
+    "resume-ranker": {
+      "command": "python",
+      "args": ["-m", "ResumeRankerMCP.server"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+Reload VS Code, then use in Copilot Chat:
+```
+@resume-ranker search for python developers with 5 years experience
+```
+
+#### Testing MCP Server
+
+**Option 1: MCP Inspector (Recommended)**
+```powershell
+npm install -g @modelcontextprotocol/inspector
+npx @modelcontextprotocol/inspector python -m ResumeRankerMCP.server
+```
+
+**Option 2: Direct Python Test**
+```python
+from ResumeRankerMCP.server import search_resumes, get_candidate_history
+
+# Test search
+results = search_resumes("senior python developer", top_k=10)
+doc_names = [c["doc_name"] for c in results["candidates"][:5]]
+
+# Test history lookup
+history = get_candidate_history(doc_names=doc_names)
+print(history)
+```
+
+**Option 3: Run as MCP Server**
+```powershell
+python -m ResumeRankerMCP.server
+```
+
+---
+
+### Component Details
+
+#### 1. **ResumeRankerFrontend** (Presentation Layer)
+- **app.py** — Streamlit UI with two main accordions:
+  - **Upload** — Dual-column interface for uploading JDs and resumes with progress indicators
+  - **Rank** — JD selector, resume multi-select dropdown, and rank button
+  - Results display with top-N table and expandable per-candidate score breakdowns
+- **Features:**
+  - Session caching for blob listings (30s TTL) to minimize Azure API roundtrips
+  - Real-time progress updates during ranking via callback functions
+  - Responsive 100% width layout with minimal margins
+  - Custom Providence Health branding (blue/olive color scheme)
+
+#### 2. **ResumeRankerCore** (Business Logic Layer)
+
+**clients.py** — Singleton clients for Azure services
+- Lazy-initialized OpenAI client with automatic Azure AD token refresh
+- BlobServiceClient for document storage
+- Environment validation on startup
+- Thread-safe token management (refreshes 5 minutes before expiry)
+
+**storage.py** — Blob storage operations
+- Upload/download documents to `resumes` and `jds` containers
+- Manages `resumes-parsed` container for caching extracted plaintext
+- Container auto-creation (no manual setup required)
+- Batch operations for listing documents
+
+**search.py** — Azure Cognitive Search client (`DocumentSearchClient`)
+- Auto-creates vector search index with HNSW algorithm on first use
+- Chunks documents into 400-token segments with 60-token overlap
+- Batch embedding (100 docs/call) for performance
+- Hybrid search (BM25 + vector) with configurable top-K and alpha blending
+- Filters search by document name for targeted retrieval
+
+**ranking.py** — Two-stage ranking pipeline
+- **Stage 1 (Free):** Hybrid search aggregates chunk scores by resume → top 25 candidates
+- **Stage 2 (Paid):** GPT-4o scores top 25 in parallel (ThreadPoolExecutor) with JSON schema validation
+- Strict scoring rubric with gap analysis and hard-floor rules
+- Reason generation for each category score
+- Total score always equals sum of category scores (enforced via prompt)
+
+**text_utils.py** — Document processing utilities
+- Extracts text from .txt, .pdf, .docx using `pypdf`, `python-docx`
+- Token-aware chunking using tiktoken (cl100k_base encoding)
+- Recursive splitting on separators (paragraphs → sentences → hard token splits)
+- LRU-cached encoder for performance
+
+#### 3. **ResumeRankerMCP** (Model Context Protocol Server)
+
+**server.py** — FastMCP server exposing three tools
+- `@mcp.tool()` decorator for tool registration
+- Integrates with ResumeRankerCore clients (OpenAI, Azure Search)
+- JSON response formatting for LLM consumption
+- Error handling with fallback responses
+
+**candidate_history.py** — Excel datastore integration
+- Reads `candidate_data.xlsx` with two sheets (metadata + history)
+- `get_by_doc_names()` — Resolve AI Search doc_name → candidate records
+- `get_by_candidate_ids()` — Direct candidate ID lookup
+- Returns merged candidate profiles with full interview history arrays
+- Uses pandas + openpyxl for Excel reading
+
+**Configuration:**
+- Runs via `python -m ResumeRankerMCP.server`
+- Configurable via `CANDIDATE_DATA_PATH` env var (defaults to `../candidate_data.xlsx`)
+- Integrates with VS Code GitHub Copilot Chat via `.vscode/settings.json`
+
+#### 4. **Azure Services Integration**
 
 **Azure OpenAI**
 - **GPT-4o:** Used for semantic scoring (Stage 2) and JD keyword extraction
@@ -355,7 +543,30 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-#### 4. Configure environment variables
+**Key Dependencies:**
+- `streamlit` — Web UI framework
+- `azure-search-documents>=11.4.0` — Vector search support
+- `openai` — Azure OpenAI client
+- `tiktoken` — Token counting for chunking
+- `pandas` + `openpyxl` — Excel datastore for candidate history
+- `mcp[cli]` — Model Context Protocol server
+- `langgraph` + `langchain` — Workflow orchestration
+- `python-docx` + `pdfplumber` — Document parsing
+
+#### 4. Set up candidate history datastore (optional)
+
+If using MCP server with interview history tracking:
+
+1. Create `candidate_data.xlsx` in project root
+2. Add two sheets:
+   - **Sheet 1:** `candidate_metadata` (columns: candidate_id, full_name, primary_email, role_family, years_experience, current_company, latest_application_status, last_interview_round, total_applications, candidate_status, latest_resume_blob_url, latest_ai_search_doc_id)
+   - **Sheet 2:** `interview_history` (columns: candidate_id, application_date, job_req_id, position_title, interview_round, interview_date, interviewer_name, technical_score, behavioral_score, overall_feedback, rejection_reason, round_status)
+
+See **Model Context Protocol (MCP) Server** section for full schema details.
+
+> **Note:** MCP tools will return empty results if `candidate_data.xlsx` is not found. Search and ranking functionality works without it.
+
+#### 5. Configure environment variables
 
 ```powershell
 Copy-Item .env.example .env
@@ -382,6 +593,9 @@ AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...;A
 RESUME_CONTAINER_NAME=resumes
 JD_CONTAINER_NAME=jds
 
+# Optional: Candidate history datastore (for MCP server)
+# CANDIDATE_DATA_PATH=candidate_data.xlsx
+
 # Optional: Azure AD Auth (for APIM/gateway scenarios)
 # AUTH_TENANT_ID=<your-tenant-id>
 # AUTH_CLIENT_ID=<your-client-id>
@@ -399,7 +613,7 @@ JD_CONTAINER_NAME=jds
 | `AZURE_SEARCH_API_KEY` | AI Search → Keys → Primary admin key |
 | `AZURE_STORAGE_CONNECTION_STRING` | Storage Account → Access keys → Connection string |
 
-#### 5. Create blob containers
+#### 6. Create blob containers
 
 **Option A: Azure Portal**
 - Navigate to Storage Account → Containers → + Container
@@ -416,14 +630,20 @@ az storage container create --name jds --connection-string $env:AZURE_STORAGE_CO
 
 > The `resumes-parsed` container is auto-created by the app.
 
-#### 6. Run the application
+#### 7. Run the application
 
+**Streamlit UI:**
 ```powershell
 cd ResumeRankerFrontend
 streamlit run app.py
 ```
 
 The app opens at **http://localhost:8501**
+
+**MCP Server (for GitHub Copilot Chat):**
+1. Ensure `.vscode/settings.json` contains MCP server configuration (see MCP section above)
+2. Reload VS Code window (`Ctrl+Shift+P` → "Developer: Reload Window")
+3. Use `@resume-ranker` in GitHub Copilot Chat
 
 The Azure Cognitive Search index (`resume_chunks`) is **auto-created on first run** — no manual setup required.
 
@@ -477,16 +697,26 @@ resumeRanking/
 │   ├── storage.py              # Blob CRUD operations
 │   ├── search.py               # DocumentSearchClient (hybrid search)
 │   ├── ranking.py              # Two-stage ranking pipeline
-│   └── text_utils.py           # Text extraction & chunking
+│   ├── text_utils.py           # Text extraction & chunking
+│   └── langgraph_pipeline.py   # LangGraph workflow orchestration
 │
 ├── ResumeRankerFrontend/       # Presentation layer
 │   └── app.py                  # Streamlit UI (accordions, ranking, results)
+│
+├── ResumeRankerMCP/            # Model Context Protocol server
+│   ├── __init__.py
+│   ├── server.py               # FastMCP server with 3 tools
+│   └── candidate_history.py   # Excel datastore integration
 │
 ├── ResumesAndJdSampleData/     # Sample data for testing
 │   ├── actual-resumes/
 │   ├── actual-servicenow-resumes/
 │   └── jds/
 │
+├── .vscode/
+│   └── settings.json           # MCP server configuration for Copilot Chat
+│
+├── candidate_data.xlsx         # Candidate metadata + interview history
 ├── .env.example                # Template for environment variables
 ├── .env                        # Your local config (git-ignored)
 ├── requirements.txt            # Python dependencies
@@ -541,15 +771,62 @@ resumeRanking/
 - Truncate input text before scoring
 - Use `gpt-4-32k` deployment for larger context window
 
+### **MCP server not appearing in Copilot Chat**
+**Checklist:**
+- ✅ `.vscode/settings.json` contains `github.copilot.chat.mcp.servers` configuration
+- ✅ VS Code window reloaded after adding MCP config (`Ctrl+Shift+P` → "Developer: Reload Window")
+- ✅ Virtual environment activated with `mcp` package installed
+- ✅ `PYTHONPATH` in MCP config points to workspace root
+
+**Debug:** Check VS Code Output panel (View → Output → select "GitHub Copilot Chat" from dropdown) for MCP server startup errors
+
+### **`FileNotFoundError: candidate_data.xlsx not found`**
+**Cause:** MCP tool `get_candidate_history` called without Excel datastore  
+**Solutions:**
+- Create `candidate_data.xlsx` in project root (see Setup Step 4)
+- Set `CANDIDATE_DATA_PATH` environment variable to custom location
+- MCP `search_resumes` and core ranking still work without history data
+
+### **`candidate_data.xlsx` returns empty results**
+**Checklist:**
+- ✅ Sheet names exactly match: `candidate_metadata` and `interview_history`
+- ✅ `latest_ai_search_doc_id` column in metadata sheet matches `doc_name` from search results
+- ✅ `candidate_id` column exists in both sheets (used for joining)
+- ✅ No hidden rows/columns or filters applied in Excel
+
+### **MCP tools return errors in Copilot Chat**
+**Debug steps:**
+1. Test tools directly in Python:
+   ```python
+   from ResumeRankerMCP.server import search_resumes
+   print(search_resumes("python developer", top_k=5))
+   ```
+2. Run MCP server manually: `python -m ResumeRankerMCP.server`
+3. Check terminal output for import errors or missing environment variables
+4. Verify all Azure credentials in `.env` are current
+
 ---
 
 ## 🔒 Security & Compliance
 
 - **Data Storage:** All documents stored in Azure Blob Storage with private access level
+- **Candidate History:** Interview data stored locally in Excel (`candidate_data.xlsx`) — ensure this file is **excluded from version control** and secured with appropriate file system permissions
 - **API Keys:** Managed via environment variables (never committed to git)
 - **Azure AD Integration:** Supports token-based auth for enterprise environments
 - **Token Auto-Refresh:** Prevents expired token errors in long-running sessions
-- **HIPAA/PII Considerations:** No PHI/PII is sent to OpenAI beyond what's in uploaded resumes/JDs — review your organization's data governance policies before use
+- **MCP Server:** Runs locally; does not expose network endpoints (stdio transport only)
+- **HIPAA/PII Considerations:** 
+  - No PHI/PII is sent to OpenAI beyond what's in uploaded resumes/JDs
+  - `candidate_data.xlsx` contains PII (names, emails) — follow organizational data governance policies
+  - Azure Cognitive Search index contains resume content (PII) — ensure appropriate access controls
+  - Review your organization's policies before use in production
+
+**Recommended Security Practices:**
+- Add `candidate_data.xlsx` to `.gitignore` (already included in standard Python `.gitignore`)
+- Use Azure Storage encryption at rest and in transit
+- Rotate API keys regularly (Azure OpenAI, Cognitive Search)
+- Enable Azure AD authentication for production deployments
+- Limit blob container access to least privilege (consider SAS tokens instead of connection strings)
 
 ---
 
@@ -565,3 +842,55 @@ resumeRanking/
 - Cost and Stage 2 time are **capped** because only top 25 candidates proceed to GPT-4o
 - With 1,000 resumes, ranking time remains ~10–15 seconds (Stage 1 scales logarithmically with vector search)
 
+---
+
+## 🔄 Candidate History Integration
+
+When using the MCP server's `rerank_candidates` tool, the system considers historical interview data from `candidate_data.xlsx` to produce more informed rankings. This enhances traditional resume matching with institutional memory.
+
+### Factors Considered During Reranking
+
+| Factor | Description | Impact on Score |
+|--------|-------------|-----------------|
+| **Resume Upload Date** | Recency of candidate's application | Recent applications prioritized; candidates with resumes >6 months old may be filtered |
+| **Has Past Interview History** | Whether candidate has been interviewed before | Returning candidates evaluated with additional context |
+| **Applied Role** | Previous positions the candidate applied for | Indicates career trajectory and role consistency |
+| **Interview Round Cleared** | Farthest round reached in past interviews | High-performing candidates from past rounds boosted |
+| **Interview Scores** | Technical and behavioral scores from history | Strong past performance increases ranking |
+| **Rejection Reason** | Why candidate was previously rejected | Red flags (e.g., culture fit issues) may lower score |
+| **Domain Expertise** | Industry experience from history + resume | Healthcare/domain-specific experience weighted higher |
+| **Skill Match** | Technical skills from resume vs. JD requirements | Core competency alignment from both resume and past interviews |
+| **Experience Match** | Years of experience and role seniority | Under/over-qualification identified via history data |
+| **Project Relevance** | Past work on similar initiatives | Project portfolios evaluated across applications |
+| **Multiple Job Switches** | Frequency of job changes | Excessive switching (>3 jobs in 2 years) may indicate retention risk |
+
+### Reranking Workflow with History
+
+```
+User triggers rerank_candidates via MCP tool
+    ↓
+1. search_resumes() returns semantic matches with doc_names
+    ↓
+2. get_candidate_history(doc_names) fetches Excel records
+    ↓
+3. Merged data passed to Azure OpenAI (GPT-4o)
+   • Input: JD + resume text + full interview history
+   • System prompt includes instructions to weight history factors
+    ↓
+4. LLM produces ranked list with explanations
+   • Score: 0–100
+   • Explanation: Cites resume content + interview history
+   • Example: "Strong Python skills (resume) + passed 3 previous
+              technical rounds (2024-01 interview) + rejected for
+              culture fit (manageable gap) = 82/100"
+    ↓
+5. Return JSON with ranked candidates
+```
+
+### Benefits of History-Aware Ranking
+
+- **Institutional Memory:** Avoid re-interviewing candidates rejected for fundamental fit issues
+- **Fast-Track Qualified Returners:** Candidates who previously cleared technical rounds require less vetting
+- **Career Trajectory Analysis:** Detect patterns in role progression and job stability
+- **Bias Reduction:** Historical scores provide objective data points beyond resume keywords
+- **Feedback Loop:** Rejection reasons inform future candidate evaluations 
