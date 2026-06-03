@@ -23,7 +23,15 @@ from ResumeRankerCore.storage import (
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCore.ranking import rank_resumes, SCORE_MAX
+import os as _os
+_USE_LANGGRAPH = _os.getenv("USE_LANGGRAPH", "false").lower() == "true"
+
+if _USE_LANGGRAPH:
+    from ResumeRankerCore.langgraph_pipeline import rank_resumes_langgraph as _rank_fn, SCORE_MAX
+    def rank_resumes(jd_text, top_n=10, selected_resumes=None, on_progress=None):
+        return _rank_fn(jd_text, top_n=top_n, selected_resumes=selected_resumes, on_progress=on_progress)
+else:
+    from ResumeRankerCore.ranking import rank_resumes, SCORE_MAX
 
 load_dotenv()
 
@@ -175,9 +183,19 @@ st.markdown(f"""
 # Header
 # ---------------------------------------------------------------------------
 
+_pipeline_badge = (
+    '<span style="background:#6B7C3F;color:#fff;font-size:0.72rem;'
+    'padding:2px 10px;border-radius:12px;margin-left:12px;vertical-align:middle;">'
+    "LangGraph Pipeline</span>"
+    if _USE_LANGGRAPH else
+    '<span style="background:#8BAAD4;color:#fff;font-size:0.72rem;'
+    'padding:2px 10px;border-radius:12px;margin-left:12px;vertical-align:middle;">'
+    "Classic Pipeline</span>"
+)
+
 st.markdown(f"""
 <div class="ph-header">
-  <h1>Resume Ranker</h1>
+  <h1>Resume Ranker {_pipeline_badge}</h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -355,14 +373,18 @@ if rank_clicked:
                 cols = st.columns(len(SCORE_MAX))
                 for col, (key, max_pts) in zip(cols, SCORE_MAX.items()):
                     val = r["scores"].get(key, 0)
-                    label = (
-                        key.replace("technicalSkills", "Tech Skills")
-                           .replace("domainFit", "Domain Fit")
-                           .replace("certifications", "Certs")
-                           .replace("education", "Education")
-                           .replace("experience", "Experience")
-                           .replace("location", "Location")
-                    )
+                    _label_map = {
+                        "technicalSkills":   "Tech Skills",
+                        "domainFit":         "Domain Fit",
+                        "certifications":    "Certs",
+                        "education":         "Education",
+                        "experience":        "Experience",
+                        "location":          "Location",
+                        "gapFill":           "Gap Fill",
+                        "teamCompatibility": "Team Compat.",
+                        "skillFreshness":    "Skill Freshness",
+                    }
+                    label = _label_map.get(key, key)
                     col.metric(label=label, value=f"{val} / {max_pts}")
 
                 st.markdown("**Scoring Reasons:**")
