@@ -1,4 +1,4 @@
-"""LangGraph state models for the multi-agent ranking pipeline."""
+"""State models for the Resume Ranking pipeline."""
 
 from typing import Dict, List, Optional
 from typing_extensions import TypedDict
@@ -14,25 +14,49 @@ class ParsedJD(TypedDict):
     location: str
 
 
-class TeamSkillProfile(TypedDict):
-    skill_coverage: Dict[str, float]   # skill -> fraction of team that has it
-    gap_skills: List[str]              # required skills where team coverage < 50%
-    skill_weights: Dict[str, float]    # skill -> scoring weight multiplier
+class InterviewRound(TypedDict):
+    interview_id: str
+    job_role: str
+    round_number: str
+    round_type: str
+    result: str
+    rejection_reason: str
+    interview_score: str
+    interview_feedback: str
+    interview_date: str
 
 
-class ResumeResult(TypedDict):
-    name: str
-    total_score: float
-    scores: Dict[str, float]
-    reasons: Dict[str, str]
+class CandidateProfile(TypedDict):
+    candidate_id: str
+    full_name: str
+    primary_email: str
+    role_family: str
+    years_experience: str
+    current_company: str
+    latest_application_status: str
+    last_interview_round: str
+    total_applications: str
+    candidate_status: str
+    latest_resume_blob_url: str
+    latest_ai_search_doc_id: str
+    semantic_score: float
+    interview_history: List[InterviewRound]
+
+
+class RankedCandidate(TypedDict):
+    candidate_id: str
+    full_name: str
+    score: float
+    explanation: str
+    resume_blob_url: str
 
 
 class RankingState(TypedDict):
     jd_text: str
     parsed_jd: Optional[ParsedJD]
-    team_skill_profile: Optional[TeamSkillProfile]
-    resume_chunks: List[Dict]
+    resume_candidates: List[Dict]          # raw search results {doc_name, semantic_score}
+    candidate_profiles: List[CandidateProfile]  # merged search + history
     selected_resumes: Optional[List[str]]
     top_n: int
-    ranked_results: List[ResumeResult]
+    ranked_results: List[RankedCandidate]
     progress_messages: List[str]

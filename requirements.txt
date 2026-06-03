@@ -7,6 +7,7 @@ azure-core
 azure-identity
 openai
 pandas
+openpyxl
 python-docx
 pdfplumber
 # LangGraph pipeline
@@ -14,8 +15,5 @@ langgraph
 langchain
 langchain-openai
 typing-extensions
-# Team skill gap analysis (optional — only needed when AZURE_SQL_CONNECTION_STRING is set)
-pyodbc
-sqlalchemy
-# Skill synonym normalization
-rapidfuzz
+# MCP server
+mcp[cli]
