@@ -396,8 +396,6 @@ with tab1:
 # ---------------------------------------------------------------------------
 
 with tab2:
-    import sys as _sys
-    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from ResumeRankerMCP.candidate_history import get_by_candidate_ids, get_by_doc_names
 
     st.markdown('<div class="section-title">Candidate History Explorer</div>', unsafe_allow_html=True)

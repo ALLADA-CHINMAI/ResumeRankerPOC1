@@ -9,7 +9,7 @@ Resolution: doc_name (from AI Search) → latest_ai_search_doc_id → candidate_
 
 import logging
 import os
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ _DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "..", "candidate_data.xl
 _EXCEL_PATH = os.getenv("CANDIDATE_DATA_PATH", _DEFAULT_PATH)
 
 
-def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load() -> Tuple[pd.DataFrame, pd.DataFrame]:
     path = os.path.abspath(_EXCEL_PATH)
     if not os.path.exists(path):
         raise FileNotFoundError(f"candidate_data.xlsx not found at: {path}")
@@ -30,7 +30,7 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     return meta, hist
 
 
-def get_by_doc_names(doc_names: list[str]) -> list[dict]:
+def get_by_doc_names(doc_names: List[str]) -> List[Dict]:
     """
     Resolve doc_names (AI Search doc keys) → candidate_ids, return merged candidate dicts.
     Each dict contains candidate metadata + list of interview_history rows.
@@ -43,14 +43,14 @@ def get_by_doc_names(doc_names: list[str]) -> list[dict]:
     return _build_results(matched, hist)
 
 
-def get_by_candidate_ids(candidate_ids: list[str]) -> list[dict]:
+def get_by_candidate_ids(candidate_ids: List[str]) -> List[Dict]:
     """Return merged candidate dicts for the given candidate_ids."""
     meta, hist = _load()
     matched = meta[meta["candidate_id"].isin(candidate_ids)]
     return _build_results(matched, hist)
 
 
-def _build_results(matched: pd.DataFrame, hist: pd.DataFrame) -> list[dict]:
+def _build_results(matched: pd.DataFrame, hist: pd.DataFrame) -> List[Dict]:
     results = []
     for _, row in matched.iterrows():
         cid = row["candidate_id"]

@@ -9,6 +9,7 @@ Tools:
 
 import json
 import logging
+from typing import Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -56,9 +57,9 @@ def search_resumes(query: str, top_k: int = 50) -> dict:
 
 @mcp.tool()
 def get_candidate_history(
-    doc_names: list[str] | None = None,
-    candidate_ids: list[str] | None = None,
-) -> dict:
+    doc_names: Optional[List[str]] = None,
+    candidate_ids: Optional[List[str]] = None,
+) -> Dict:
     """
     Read candidate metadata and full interview history from candidate_data.xlsx.
 
@@ -99,7 +100,7 @@ Order by score descending. No markdown, no extra text.
 
 
 @mcp.tool()
-def rerank_candidates(jd: str, candidates: list[dict]) -> dict:
+def rerank_candidates(jd: str, candidates: List[Dict]) -> Dict:
     """
     Use Azure OpenAI to produce a final ranked list.
 
