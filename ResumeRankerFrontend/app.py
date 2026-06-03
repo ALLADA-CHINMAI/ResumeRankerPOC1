@@ -201,195 +201,280 @@ st.markdown(f"""
 
 
 # ---------------------------------------------------------------------------
-# Accordions for Upload and Ranking Sections
+# Tabs
 # ---------------------------------------------------------------------------
 
+tab1, tab2 = st.tabs(["Resume Ranking", "Candidate History"])
 
-with st.container():
-    with st.expander("📤 Upload New Job Descriptions & Resumes", expanded=True):
-        up_col1, up_col2 = st.columns(2, gap="large")
-        with up_col1:
-            st.markdown('<div class="section-title">Upload New Job Descriptions</div>', unsafe_allow_html=True)
-            jd_files = st.file_uploader(
-                "Select JD files (.txt, .pdf, .docx)",
-                accept_multiple_files=True,
-                key="jd_uploader",
-            )
-            if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
-                errors = []
-                for f in jd_files:
-                    data = f.read()
-                    try:
-                        upload_blob(JD_CONTAINER, f.name, data)
-                        text = extract_text(f.name, data)
-                        if text.strip():
-                            jd_search.index_document(f.name, text)
-                        else:
-                            errors.append(f"{f.name}: no text extracted")
-                    except Exception as e:
-                        errors.append(f"{f.name}: {e}")
-                _list_jds.clear()  # refresh JD dropdown
-                _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
-                for err in errors:
-                    st.warning(err)
-                st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
-        with up_col2:
-            st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
-            resume_files = st.file_uploader(
-                "Select resume files (.txt, .pdf, .docx)",
-                accept_multiple_files=True,
-                key="resume_uploader",
-            )
-            if st.button("Upload & Index Resumes", disabled=not resume_files, key="btn_upload_res"):
-                progress = st.progress(0, text="Starting…")
-                errors = []
-                for idx, f in enumerate(resume_files):
-                    progress.progress((idx + 0.5) / len(resume_files), text=f"Uploading {f.name}…")
-                    data = f.read()
-                    try:
-                        upload_blob(RESUME_CONTAINER, f.name, data)
-                        text = extract_text(f.name, data)
-                        if text.strip():
-                            progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
-                            resume_search.index_document(f.name, text)
-                            store_parsed_text(f.name, text)
-                        else:
-                            errors.append(f"{f.name}: no text extracted")
-                    except Exception as e:
-                        errors.append(f"{f.name}: {e}")
-                    progress.progress((idx + 1) / len(resume_files))
-                progress.empty()
-                _list_resumes.clear()  # refresh resume list
-                _list_jds.clear()      # also clear JD cache in case resumes affect downstream logic
-                for err in errors:
-                    st.warning(err)
-                st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
+# ---------------------------------------------------------------------------
+# Tab 1 — existing Resume Ranking UI (unchanged)
+# ---------------------------------------------------------------------------
 
-st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
-
-
-
-
-with st.container():
-    with st.expander("📊 Rank Resumes Against a Job Description", expanded=True):
-        col1, col2 = st.columns(2, gap="large")
-        selected_jd = None
-        all_resumes: list = []
-        selected_resumes: list = []
-        with col1:
-            st.markdown('<div class="section-title">Select Job Description</div>', unsafe_allow_html=True)
-            with st.spinner("Loading job descriptions…"):
-                try:
-                    jd_list = _list_jds()
-                except Exception as e:
-                    jd_list = []
-                    st.warning(f"Could not list job descriptions: {e}")
-            if not jd_list:
-                st.info("No job descriptions found. Upload a JD above first.")
-            else:
-                selected_jd = st.selectbox(
-                    "Job Description",
-                    jd_list,
-                    key="jd_select",
-                    label_visibility="collapsed",
+with tab1:
+    with st.container():
+        with st.expander("📤 Upload New Job Descriptions & Resumes", expanded=True):
+            up_col1, up_col2 = st.columns(2, gap="large")
+            with up_col1:
+                st.markdown('<div class="section-title">Upload New Job Descriptions</div>', unsafe_allow_html=True)
+                jd_files = st.file_uploader(
+                    "Select JD files (.txt, .pdf, .docx)",
+                    accept_multiple_files=True,
+                    key="jd_uploader",
                 )
-        with col2:
-            st.markdown('<div class="section-title">Select Resumes to Rank</div>', unsafe_allow_html=True)
-            with st.spinner("Loading resumes…"):
-                try:
-                    all_resumes = _list_resumes()
-                except Exception as e:
-                    all_resumes = []
-                    st.warning(f"Could not list resumes: {e}")
-            if not all_resumes:
-                st.info("No resumes found. Upload resumes above first.")
-            else:
-                selected_resumes = st.multiselect(
-                    "Resumes",
-                    all_resumes,
-                    default=all_resumes,
-                    key="resume_multiselect",
+                if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
+                    errors = []
+                    for f in jd_files:
+                        data = f.read()
+                        try:
+                            upload_blob(JD_CONTAINER, f.name, data)
+                            text = extract_text(f.name, data)
+                            if text.strip():
+                                jd_search.index_document(f.name, text)
+                            else:
+                                errors.append(f"{f.name}: no text extracted")
+                        except Exception as e:
+                            errors.append(f"{f.name}: {e}")
+                    _list_jds.clear()  # refresh JD dropdown
+                    _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
+                    for err in errors:
+                        st.warning(err)
+                    st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
+            with up_col2:
+                st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
+                resume_files = st.file_uploader(
+                    "Select resume files (.txt, .pdf, .docx)",
+                    accept_multiple_files=True,
+                    key="resume_uploader",
                 )
-                st.caption(f"{len(selected_resumes)} of {len(all_resumes)} selected")
+                if st.button("Upload & Index Resumes", disabled=not resume_files, key="btn_upload_res"):
+                    progress = st.progress(0, text="Starting…")
+                    errors = []
+                    for idx, f in enumerate(resume_files):
+                        progress.progress((idx + 0.5) / len(resume_files), text=f"Uploading {f.name}…")
+                        data = f.read()
+                        try:
+                            upload_blob(RESUME_CONTAINER, f.name, data)
+                            text = extract_text(f.name, data)
+                            if text.strip():
+                                progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
+                                resume_search.index_document(f.name, text)
+                                store_parsed_text(f.name, text)
+                            else:
+                                errors.append(f"{f.name}: no text extracted")
+                        except Exception as e:
+                            errors.append(f"{f.name}: {e}")
+                        progress.progress((idx + 1) / len(resume_files))
+                    progress.empty()
+                    _list_resumes.clear()  # refresh resume list
+                    _list_jds.clear()      # also clear JD cache in case resumes affect downstream logic
+                    for err in errors:
+                        st.warning(err)
+                    st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
 
+    st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
 
-# --- Rank Resumes Button (after both accordions, unique key, 100% width/centered) ---
+    with st.container():
+        with st.expander("📊 Rank Resumes Against a Job Description", expanded=True):
+            col1, col2 = st.columns(2, gap="large")
+            selected_jd = None
+            all_resumes: list = []
+            selected_resumes: list = []
+            with col1:
+                st.markdown('<div class="section-title">Select Job Description</div>', unsafe_allow_html=True)
+                with st.spinner("Loading job descriptions…"):
+                    try:
+                        jd_list = _list_jds()
+                    except Exception as e:
+                        jd_list = []
+                        st.warning(f"Could not list job descriptions: {e}")
+                if not jd_list:
+                    st.info("No job descriptions found. Upload a JD above first.")
+                else:
+                    selected_jd = st.selectbox(
+                        "Job Description",
+                        jd_list,
+                        key="jd_select",
+                        label_visibility="collapsed",
+                    )
+            with col2:
+                st.markdown('<div class="section-title">Select Resumes to Rank</div>', unsafe_allow_html=True)
+                with st.spinner("Loading resumes…"):
+                    try:
+                        all_resumes = _list_resumes()
+                    except Exception as e:
+                        all_resumes = []
+                        st.warning(f"Could not list resumes: {e}")
+                if not all_resumes:
+                    st.info("No resumes found. Upload resumes above first.")
+                else:
+                    selected_resumes = st.multiselect(
+                        "Resumes",
+                        all_resumes,
+                        default=all_resumes,
+                        key="resume_multiselect",
+                    )
+                    st.caption(f"{len(selected_resumes)} of {len(all_resumes)} selected")
 
+    # --- Rank Resumes Button ---
+    st.markdown('<div style="height:2px;"></div>', unsafe_allow_html=True)
+    can_rank = bool('selected_jd' in locals() and 'selected_resumes' in locals() and selected_jd and selected_resumes)
+    st.markdown('<div class="rank-btn" style="width:100%;display:flex;justify-content:center;margin-top:-2px;margin-bottom:2px;">', unsafe_allow_html=True)
+    rank_clicked = st.button("Rank Resumes →", disabled=not can_rank, key="btn_rank_main")
+    st.markdown('</div>', unsafe_allow_html=True)
 
+    if rank_clicked:
+        try:
+            jd_data = fetch_blob(JD_CONTAINER, selected_jd)
+            jd_text = extract_text(selected_jd, jd_data)
+        except Exception as e:
+            st.error(f"Failed to load job description: {e}")
+            st.stop()
 
-# Minimum space between sections and button
-st.markdown('<div style="height:2px;"></div>', unsafe_allow_html=True)
-can_rank = bool('selected_jd' in locals() and 'selected_resumes' in locals() and selected_jd and selected_resumes)
-st.markdown('<div class="rank-btn" style="width:100%;display:flex;justify-content:center;margin-top:-2px;margin-bottom:2px;">', unsafe_allow_html=True)
-rank_clicked = st.button("Rank Resumes →", disabled=not can_rank, key="btn_rank_main")
-st.markdown('</div>', unsafe_allow_html=True)
+        filter_resumes = (
+            selected_resumes
+            if set(selected_resumes) != set(all_resumes)
+            else None
+        )
 
-if rank_clicked:
+        with st.status("Ranking in progress…", expanded=True) as status:
+            log = st.empty()
+            messages: list = []
+
+            def _progress(msg: str):
+                messages.append(msg)
+                log.markdown("\n".join(f"→ {m}" for m in messages[-6:]))
+
+            results = rank_resumes(
+                jd_text,
+                top_n=10,
+                selected_resumes=filter_resumes,
+                on_progress=_progress,
+            )
+            status.update(label="Ranking complete!", state="complete", expanded=False)
+
+        if not results:
+            st.warning("No resumes could be scored. Check that resumes are indexed in the Upload section.")
+        else:
+            st.success(f"Top {len(results)} candidates for **{selected_jd}**")
+
+            table_rows = [
+                {"Rank": i + 1, "Resume": r["name"], "Score": f"{r['total_score']:.1f} / 100"}
+                for i, r in enumerate(results)
+            ]
+            st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+
+            st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+            st.markdown('<div class="section-title">Score Breakdown</div>', unsafe_allow_html=True)
+
+            for i, r in enumerate(results):
+                with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
+                    cols = st.columns(len(SCORE_MAX))
+                    for col, (key, max_pts) in zip(cols, SCORE_MAX.items()):
+                        val = r["scores"].get(key, 0)
+                        _label_map = {
+                            "technicalSkills":   "Tech Skills",
+                            "domainFit":         "Domain Fit",
+                            "certifications":    "Certs",
+                            "education":         "Education",
+                            "experience":        "Experience",
+                            "location":          "Location",
+                            "gapFill":           "Gap Fill",
+                            "teamCompatibility": "Team Compat.",
+                            "skillFreshness":    "Skill Freshness",
+                        }
+                        label = _label_map.get(key, key)
+                        col.metric(label=label, value=f"{val} / {max_pts}")
+
+                    st.markdown("**Scoring Reasons:**")
+                    for key in SCORE_MAX:
+                        reason = r["reasons"].get(key, "")
+                        if reason:
+                            st.markdown(f"- **{key}**: {reason}")
+
+# ---------------------------------------------------------------------------
+# Tab 2 — Candidate History (MCP POC demo)
+# ---------------------------------------------------------------------------
+
+with tab2:
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from ResumeRankerMCP.candidate_history import get_by_candidate_ids, get_by_doc_names
+
+    st.markdown('<div class="section-title">Candidate History Explorer</div>', unsafe_allow_html=True)
+    st.caption("Reads directly from candidate_data.xlsx — no Azure SQL needed for POC.")
+
+    # Load Excel
+    _EXCEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "candidate_data.xlsx")
+
+    @st.cache_data(ttl=60)
+    def _load_candidate_data():
+        return pd.read_excel(_EXCEL_PATH, sheet_name="candidate_metadata", dtype=str).fillna(""), \
+               pd.read_excel(_EXCEL_PATH, sheet_name="interview_history", dtype=str).fillna("")
+
     try:
-        jd_data = fetch_blob(JD_CONTAINER, selected_jd)
-        jd_text = extract_text(selected_jd, jd_data)
-    except Exception as e:
-        st.error(f"Failed to load job description: {e}")
+        df_meta, df_hist = _load_candidate_data()
+    except FileNotFoundError:
+        st.error("candidate_data.xlsx not found. Expected at project root.")
         st.stop()
 
-    filter_resumes = (
-        selected_resumes
-        if set(selected_resumes) != set(all_resumes)
-        else None
-    )
+    # --- Filters ---
+    fcol1, fcol2, fcol3 = st.columns(3)
+    with fcol1:
+        role_options = ["All"] + sorted(df_meta["role_family"].unique().tolist())
+        filter_role = st.selectbox("Role Family", role_options, key="ch_role")
+    with fcol2:
+        status_options = ["All"] + sorted(df_meta["latest_application_status"].unique().tolist())
+        filter_status = st.selectbox("Application Status", status_options, key="ch_status")
+    with fcol3:
+        search_name = st.text_input("Search by Name", placeholder="e.g. John", key="ch_name")
 
-    with st.status("Ranking in progress…", expanded=True) as status:
-        log = st.empty()
-        messages: list = []
+    filtered = df_meta.copy()
+    if filter_role != "All":
+        filtered = filtered[filtered["role_family"] == filter_role]
+    if filter_status != "All":
+        filtered = filtered[filtered["latest_application_status"] == filter_status]
+    if search_name:
+        filtered = filtered[filtered["full_name"].str.contains(search_name, case=False, na=False)]
 
-        def _progress(msg: str):
-            messages.append(msg)
-            log.markdown("\n".join(f"→ {m}" for m in messages[-6:]))
+    st.markdown(f"**{len(filtered)} candidate(s) found**")
+    st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
 
-        results = rank_resumes(
-            jd_text,
-            top_n=10,
-            selected_resumes=filter_resumes,
-            on_progress=_progress,
-        )
-        status.update(label="Ranking complete!", state="complete", expanded=False)
-
-    if not results:
-        st.warning("No resumes could be scored. Check that resumes are indexed in the Upload section.")
+    # --- Candidate cards ---
+    if filtered.empty:
+        st.info("No candidates match the selected filters.")
     else:
-        st.success(f"Top {len(results)} candidates for **{selected_jd}**")
-
-        table_rows = [
-            {"Rank": i + 1, "Resume": r["name"], "Score": f"{r['total_score']:.1f} / 100"}
-            for i, r in enumerate(results)
-        ]
-        st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+        # Summary table
+        summary_cols = ["candidate_id", "full_name", "role_family", "years_experience",
+                        "current_company", "latest_application_status", "last_interview_round",
+                        "total_applications", "candidate_status"]
+        st.dataframe(filtered[summary_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
 
         st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Score Breakdown</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Interview History</div>', unsafe_allow_html=True)
 
-        for i, r in enumerate(results):
-            with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
-                cols = st.columns(len(SCORE_MAX))
-                for col, (key, max_pts) in zip(cols, SCORE_MAX.items()):
-                    val = r["scores"].get(key, 0)
-                    _label_map = {
-                        "technicalSkills":   "Tech Skills",
-                        "domainFit":         "Domain Fit",
-                        "certifications":    "Certs",
-                        "education":         "Education",
-                        "experience":        "Experience",
-                        "location":          "Location",
-                        "gapFill":           "Gap Fill",
-                        "teamCompatibility": "Team Compat.",
-                        "skillFreshness":    "Skill Freshness",
-                    }
-                    label = _label_map.get(key, key)
-                    col.metric(label=label, value=f"{val} / {max_pts}")
+        for _, row in filtered.iterrows():
+            cid = row["candidate_id"]
+            hist = df_hist[df_hist["candidate_id"] == cid]
+            rounds = len(hist)
+            last_result = hist.iloc[-1]["result"] if rounds > 0 else "—"
+            label = f"{row['full_name']}  ·  {row['role_family']}  ·  {rounds} round(s)  ·  Last: {last_result}"
+            with st.expander(label):
+                mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+                mcol1.metric("Experience", f"{row.get('years_experience', '—')} yrs")
+                mcol2.metric("Applications", row.get("total_applications", "—"))
+                mcol3.metric("Status", row.get("candidate_status", "—"))
+                mcol4.metric("Last Round", row.get("last_interview_round", "—"))
 
-                st.markdown("**Scoring Reasons:**")
-                for key in SCORE_MAX:
-                    reason = r["reasons"].get(key, "")
-                    if reason:
-                        st.markdown(f"- **{key}**: {reason}")
+                if hist.empty:
+                    st.info("No interview history on record.")
+                else:
+                    hist_display = hist[["round_number", "round_type", "result",
+                                        "rejection_reason", "interview_score",
+                                        "interview_feedback", "interview_date"]].copy()
+                    hist_display.columns = ["Round #", "Type", "Result",
+                                            "Rejection Reason", "Score", "Feedback", "Date"]
+                    st.dataframe(hist_display.reset_index(drop=True), use_container_width=True, hide_index=True)
+
+                if row.get("latest_resume_blob_url"):
+                    st.markdown(f"[View Resume]({row['latest_resume_blob_url']})")
 
