@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "ResumeRanker": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "ResumeRankerMCP.main", "--transport", "stdio"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

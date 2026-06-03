@@ -9,3 +9,7 @@ openai
 pandas
 python-docx
 pdfplumber
+
+# MCP server (requires Python 3.10+)
+fastmcp>=2.0.0
+uvicorn>=0.29.0
