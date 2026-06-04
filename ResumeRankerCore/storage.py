@@ -6,9 +6,12 @@ so ranking doesn't need to reassemble it from search index chunks.
 
 import os
 import logging
+import urllib.parse
+from datetime import datetime, timezone, timedelta
 from typing import List
 
 from dotenv import load_dotenv
+from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 from ResumeRankerCore.clients import get_blob_service
 
 load_dotenv()
@@ -78,3 +81,26 @@ def fetch_parsed_text(doc_name: str) -> str:
     """Fetch cached parsed text. Raises if the blob doesn't exist (caller should fall back)."""
     data = fetch_blob(PARSED_TEXT_CONTAINER, doc_name)
     return data.decode("utf-8")
+
+
+def get_blob_url(container: str, name: str, expiry_minutes: int = 60) -> str:
+    """Return a short-lived SAS URL for the given blob, suitable for opening in a browser."""
+    from ResumeRankerCore.clients import STORAGE_CONN_STR
+    parts = {}
+    for segment in STORAGE_CONN_STR.split(";"):
+        if "=" in segment:
+            k, _, v = segment.partition("=")
+            parts[k] = v
+    account_name = parts.get("AccountName", "")
+    account_key = parts.get("AccountKey", "")
+    endpoint_suffix = parts.get("EndpointSuffix", "core.windows.net")
+    sas = generate_blob_sas(
+        account_name=account_name,
+        container_name=container,
+        blob_name=name,
+        account_key=account_key,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes),
+    )
+    encoded_name = urllib.parse.quote(name, safe="/")
+    return f"https://{account_name}.blob.{endpoint_suffix}/{container}/{encoded_name}?{sas}"

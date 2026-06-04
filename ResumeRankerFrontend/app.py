@@ -20,6 +20,7 @@ from ResumeRankerCore.storage import (
     fetch_blob,
     upload_blob,
     store_parsed_text,
+    get_blob_url,
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
@@ -342,13 +343,30 @@ if rank_clicked:
         st.success(f"Top {len(results)} candidates for **{selected_jd}**")
 
         table_rows = [
-            {"Rank": i + 1, "Resume": r["name"], "Score": f"{r['total_score']:.1f} / 100"}
+            {
+                "Rank": i + 1,
+                "Resume": r["name"],
+                "Score": f"{r['total_score']:.1f} / 100",
+                "Link": get_blob_url(RESUME_CONTAINER, r["name"]),
+            }
             for i, r in enumerate(results)
         ]
-        st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+        st.dataframe(
+            pd.DataFrame(table_rows),
+            column_config={"Link": st.column_config.LinkColumn("Open", display_text="Open ↗")},
+            use_container_width=True,
+            hide_index=True,
+        )
 
         st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">JD Keywords (extracted by OpenAI)</div>', unsafe_allow_html=True)
+        jd_kw_col, jd_link_col = st.columns([6, 1])
+        with jd_kw_col:
+            st.markdown('<div class="section-title">JD Keywords (extracted by OpenAI)</div>', unsafe_allow_html=True)
+        with jd_link_col:
+            try:
+                st.link_button("Open JD ↗", get_blob_url(JD_CONTAINER, selected_jd))
+            except Exception:
+                pass
         try:
             jd_keywords = extract_jd_keywords(jd_text)
             st.info(jd_keywords)
