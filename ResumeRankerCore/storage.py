@@ -83,18 +83,34 @@ def fetch_parsed_text(doc_name: str) -> str:
     return data.decode("utf-8")
 
 
+_INLINE_TYPES = {
+    ".pdf":  "application/pdf",
+    ".txt":  "text/plain",
+}
+_OFFICE_EXTS = {".docx", ".doc"}
+
+
 def get_blob_url(container: str, name: str, expiry_minutes: int = 60) -> str:
-    """Return a short-lived SAS URL for the given blob, suitable for opening in a browser."""
+    """Return a URL that opens the blob for viewing (not downloading) in a browser tab.
+
+    - PDF / TXT  → direct SAS URL with inline Content-Disposition (browser renders natively).
+    - DOCX / DOC → Microsoft Office Online viewer wrapping the SAS URL (no local install needed).
+    - Other      → plain SAS URL (browser default behaviour).
+    """
     from ResumeRankerCore.clients import STORAGE_CONN_STR
     parts = {}
     for segment in STORAGE_CONN_STR.split(";"):
         if "=" in segment:
             k, _, v = segment.partition("=")
             parts[k] = v
-    account_name = parts.get("AccountName", "")
-    account_key = parts.get("AccountKey", "")
+    account_name   = parts.get("AccountName", "")
+    account_key    = parts.get("AccountKey", "")
     endpoint_suffix = parts.get("EndpointSuffix", "core.windows.net")
-    sas = generate_blob_sas(
+
+    ext = os.path.splitext(name)[1].lower()
+    content_type = _INLINE_TYPES.get(ext)
+
+    sas_kwargs: dict = dict(
         account_name=account_name,
         container_name=container,
         blob_name=name,
@@ -102,5 +118,15 @@ def get_blob_url(container: str, name: str, expiry_minutes: int = 60) -> str:
         permission=BlobSasPermissions(read=True),
         expiry=datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes),
     )
+    if content_type:
+        sas_kwargs["content_type"] = content_type
+        sas_kwargs["content_disposition"] = "inline"
+
+    sas = generate_blob_sas(**sas_kwargs)
     encoded_name = urllib.parse.quote(name, safe="/")
-    return f"https://{account_name}.blob.{endpoint_suffix}/{container}/{encoded_name}?{sas}"
+    blob_url = f"https://{account_name}.blob.{endpoint_suffix}/{container}/{encoded_name}?{sas}"
+
+    if ext in _OFFICE_EXTS:
+        return "https://view.officeapps.live.com/op/view.aspx?src=" + urllib.parse.quote(blob_url, safe="")
+
+    return blob_url
