@@ -92,18 +92,8 @@ pip install -r requirements.txt
 
 ## How to Run the MCP Server
 
-### stdio mode — for Claude Desktop and GitHub Copilot
-
 ```bash
 # From ResumeRankerPOC1/
-python -m ResumeRankerMCP.main --transport stdio
-```
-
-The server reads MCP JSON-RPC from stdin and writes responses to stdout. All logs go to stderr.
-
-### HTTP/SSE mode — for cloud or remote agent connections
-
-```bash
 python -m ResumeRankerMCP.main --transport http --port 8000
 # Clients connect to: http://localhost:8000/sse
 ```
@@ -138,42 +128,7 @@ python -m ResumeRankerMCP.test_tools --test gaps
 
 This validates Azure connectivity and each tool function before involving any MCP client.
 
-### Option B — GitHub Copilot on Windows (VSCode Agent mode)
-
-The `.vscode/mcp.json` file is already committed. VSCode picks it up automatically.
-
-**Steps:**
-1. Pull the latest branch in VSCode on Windows
-2. Open **Copilot Chat** (`Ctrl+Shift+I`)
-3. Switch to **Agent** mode using the dropdown in the chat input
-4. VSCode auto-discovers `.vscode/mcp.json` — look for a **Start** button in the MCP panel, or it starts on first use
-5. Type natural language queries — Copilot calls the appropriate tool automatically
-
-**Sample queries to try:**
-```
-List all candidates in the resume database
-Search for candidates with Python and AWS experience
-Find the top 3 candidates for a senior software engineer role requiring 5+ years Python
-Compare [paste two filenames from list_candidates] for this DevOps role
-Give me a structured profile of [candidate filename]
-```
-
-**Windows note:** The `mcp.json` uses `"command": "python"` — this must resolve to Python 3.10+ in your PATH. If you have multiple Python versions, use the full path:
-
-```json
-{
-  "servers": {
-    "ResumeRanker": {
-      "type": "stdio",
-      "command": "C:\\Python311\\python.exe",
-      "args": ["-m", "ResumeRankerMCP.main", "--transport", "stdio"],
-      "cwd": "${workspaceFolder}"
-    }
-  }
-}
-```
-
-### Option C — Quick HTTP smoke test
+### Option B — Quick HTTP smoke test
 
 ```bash
 # Terminal 1: start the server
@@ -183,12 +138,23 @@ python -m ResumeRankerMCP.main --transport http --port 8000
 curl http://localhost:8000/sse
 ```
 
+### Option C — MCP Inspector (interactive UI)
+
+```bash
+# Terminal 1: start the server
+python -m ResumeRankerMCP.main --transport http --port 8000
+
+# Terminal 2: launch the inspector
+npx @modelcontextprotocol/inspector http://localhost:8000/sse
+```
+
+Opens a browser UI at `http://localhost:5173` where you can browse all tools, fill in arguments, and call them interactively — no client code needed.
+
 ---
 
 ## Architecture Notes
 
 - **No ingestion via MCP** — Resumes and JDs are uploaded through the Streamlit UI. The MCP server is query-only.
-- **Stdio logging safety** — In stdio mode, stdout is reserved for MCP protocol frames. The server configures all logging to stderr to prevent protocol corruption.
 - **Docstrings = tool descriptions** — FastMCP converts each function's docstring into the `description` field the agent reads from `tools/list`. The docstrings include usage examples so the agent can select the right tool.
 - **Cost cap** — `rank_candidates_for_job` uses the same two-stage pipeline as the Streamlit UI: GPT-4o is only called on the top 15 candidates from hybrid search, regardless of corpus size.
 - **Python 3.10+ scoped** — Only `ResumeRankerMCP/` requires Python 3.10+. `ResumeRankerCore` and `ResumeRankerFrontend` are unchanged.
