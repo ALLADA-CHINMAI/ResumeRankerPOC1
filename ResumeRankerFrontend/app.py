@@ -9,6 +9,7 @@ import os
 # Ensure project root is on sys.path so 'ResumeRankerCore' is importable.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import re
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
@@ -32,6 +33,47 @@ BLUE  = "#00338E"
 OLIVE = "#6B7C3F"
 WHITE = "#FFFFFF"
 LIGHT = "#F4F6FA"
+
+_KEY_LABELS = {
+    "experience":      "Experience",
+    "technicalSkills": "Technical Skills",
+    "certifications":  "Certifications",
+    "education":       "Education",
+    "location":        "Location",
+    "domainFit":       "Domain Fit",
+}
+
+_STATUS_COLOR = {
+    "exceeds":      "#1a7a1a",
+    "aligned":      "#1a7a1a",
+    "met":          "#1a7a1a",
+    "full match":   "#1a7a1a",
+    "partial":      "#cc7a00",
+    "partial match":"#cc7a00",
+    "didn't meet":  "#c0392b",
+    "not met":      "#c0392b",
+}
+
+_STATUS_RE = re.compile(
+    r'\b(Exceeds?|Aligned?|Partial(?:\s+Match)?|Did(?:n\'t)?\s*Meet|Not\s*Met|Met|Full\s+Match)(?=:)',
+    re.IGNORECASE,
+)
+
+def _format_reason(text: str) -> str:
+    """Color and bold status words; place 'Not Met:' on its own line."""
+    # Move "Not Met:" onto its own line (may follow a period or space)
+    text = re.sub(
+        r'\.?\s+Not Met:',
+        '<br><b style="color:#c0392b;">Not Met:</b>',
+        text, flags=re.IGNORECASE,
+    )
+
+    def _style(m: re.Match) -> str:
+        word = m.group(0)
+        color = _STATUS_COLOR.get(word.lower().rstrip(":"), "#1a1a2e")
+        return f'<b style="color:{color};">{word}</b>'
+
+    return _STATUS_RE.sub(_style, text)
 
 # ---------------------------------------------------------------------------
 # One-time init
@@ -379,75 +421,28 @@ if rank_clicked:
                     for item in items
                 )
 
-            # Row 1: Job Title spanning full width
-            if kw.get("jobTitle"):
+            _KW_ORDER = [
+                ("jobTitle",        "Job Title",         False),
+                ("technicalSkills", "Technical Skills",  True),
+                ("experience",      "Experience",        False),
+                ("certifications",  "Certifications",    True),
+                ("education",       "Education",         False),
+                ("location",        "Location",          False),
+                ("domain",          "Domain",            False),
+            ]
+
+            for field, label, is_list in _KW_ORDER:
+                val = kw.get(field)
+                if not val:
+                    continue
+                content = _chips(val) if is_list else f'<span style="font-size:0.9rem;">{val}</span>'
                 st.markdown(
                     f'<div style="margin-bottom:10px;">'
-                    f'<span style="font-weight:700;color:{BLUE};font-size:0.85rem;">JOB TITLE &nbsp;</span>'
-                    f'<span style="font-size:1rem;font-weight:600;">{kw["jobTitle"]}</span>'
+                    f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">{label.upper()}</div>'
+                    f'{content}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-
-            # Row 2: Tech Skills (wide) + Experience
-            col_ts, col_exp = st.columns([3, 2])
-            with col_ts:
-                if kw.get("technicalSkills"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">TECHNICAL SKILLS</div>'
-                        f'{_chips(kw["technicalSkills"])}'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-            with col_exp:
-                if kw.get("experience"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">EXPERIENCE</div>'
-                        f'<span style="font-size:0.9rem;">{kw["experience"]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-
-            # Row 3: Certs | Education | Location | Domain
-            col_cert, col_edu, col_loc, col_dom = st.columns(4)
-            with col_cert:
-                if kw.get("certifications"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">CERTIFICATIONS</div>'
-                        f'{_chips(kw["certifications"])}'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-            with col_edu:
-                if kw.get("education"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">EDUCATION</div>'
-                        f'<span style="font-size:0.9rem;">{kw["education"]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-            with col_loc:
-                if kw.get("location"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">LOCATION</div>'
-                        f'<span style="font-size:0.9rem;">{kw["location"]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-            with col_dom:
-                if kw.get("domain"):
-                    st.markdown(
-                        f'<div style="margin-bottom:10px;">'
-                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">DOMAIN</div>'
-                        f'<span style="font-size:0.9rem;">{kw["domain"]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
 
         except Exception as e:
             st.warning(f"Could not extract JD keywords: {e}")
@@ -474,5 +469,12 @@ if rank_clicked:
                 for key in SCORE_MAX:
                     reason = r["reasons"].get(key, "")
                     if reason:
-                        st.markdown(f"- **{key}**: {reason}")
+                        label = _KEY_LABELS.get(key, key.title())
+                        st.markdown(
+                            f'<div style="margin-bottom:8px;padding-left:4px;">'
+                            f'<div style="font-weight:700;color:{BLUE};font-size:0.85rem;margin-bottom:2px;">{label}</div>'
+                            f'<div style="padding-left:8px;font-size:0.9rem;">{_format_reason(reason)}</div>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
 

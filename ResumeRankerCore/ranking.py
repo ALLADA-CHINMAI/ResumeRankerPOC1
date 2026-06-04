@@ -34,6 +34,8 @@ location (max 5): How well the candidate's stated location or willingness to rel
 domainFit (max 10): Alignment of the candidate's career history and industry/domain experience with the target job's field or sector.
 
 For each category, assign a score from 0 up to the max. Also provide a brief reason for each score. Return valid JSON with totalScore (sum of all categories), a 'scores' object, and a 'scoringReasons' object. Do not include markdown or extra text.
+
+For each entry in 'scoringReasons': begin with exactly one of these status words followed by a colon — 'Exceeds:', 'Aligned:', 'Partial:', or 'Didn\'t Meet:'. After the colon, describe what matched or exceeded the requirements. If any requirements were not satisfied, append a sentence starting with 'Not Met:' followed by what was missing or insufficient.
 """
 
 # Maximum points per category — used for validation and UI display
