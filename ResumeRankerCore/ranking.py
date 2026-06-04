@@ -28,13 +28,12 @@ You are an expert resume evaluator. For each resume, score the following categor
 
 experience (max 35): Total years and depth of relevant work experience for the job, including how well the candidate's roles and responsibilities match the job description.
 technicalSkills (max 40): Coverage and proficiency in the specific technical skills, tools, languages, or platforms required by the job description.
-certifications (max 5): Presence of any certifications or licenses explicitly required or preferred by the job description.
-education (max 5): Relevance and level of the candidate's educational background compared to the job requirements (degree, field, etc.).
-location (max 5): How well the candidate's stated location or willingness to relocate/remote matches the job's location requirements.
-domainFit (max 10): Alignment of the candidate's career history and industry/domain experience with the target job's field or sector.
+certifications (max 5): If the job description explicitly requires or prefers certifications/licenses, score based on how well the candidate meets them. If the job description does NOT mention any certifications or licenses, award the full 5 points automatically.
+education (max 5): If the job description explicitly requires a specific degree, field, or education level, score based on how well the candidate meets it. If the job description does NOT mention any education requirements, award the full 5 points automatically.
+location (max 5): If the job description explicitly specifies a location, on-site requirement, or remote policy, score based on how well the candidate matches it. If the job description does NOT mention any location requirements, award the full 5 points automatically.
+domainFit (max 10): Alignment of the candidate's career history and industry/domain experience with the target job's field or sector, not location.
 
-For each category, assign a score from 0 up to the max. Also provide a brief reason for each score. Return valid JSON with totalScore (sum of all categories), a 'scores' object, and a 'scoringReasons' object. Do not include markdown or extra text.
-
+For each category, assign a score from 0 up to the max. Also provide a brief reason for each score. Return valid JSON with totalScore (sum of all categories), a 'scores' object, and a 'scoringReasons' object. In 'scoringReasons' object clearly provide why the score was assigned and why was it reduced if its less than the maximum score and at the end of reason mention if that's category is a full/partial/no match with the job description. Do not include markdown or extra text.
 For each entry in 'scoringReasons': begin with exactly one of these status words followed by a colon — 'Exceeds:', 'Aligned:', 'Partial:', or 'Didn\'t Meet:'. After the colon, describe what matched or exceeded the requirements. If any requirements were not satisfied, append a sentence starting with 'Not Met:' followed by what was missing or insufficient.
 """
 
