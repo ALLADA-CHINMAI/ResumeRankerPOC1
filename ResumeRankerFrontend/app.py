@@ -9,10 +9,13 @@ import os
 # Ensure project root is on sys.path so 'ResumeRankerCore' is importable.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import logging
 import re
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 from ResumeRankerCore.clients import validate_config, get_resume_search, get_jd_search
 from ResumeRankerCore.text_utils import extract_text
@@ -26,6 +29,7 @@ from ResumeRankerCore.storage import (
     JD_CONTAINER,
 )
 from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured, SCORE_MAX
+from ResumeRankerCore.xlsx_utils import update_candidate_metadata
 
 load_dotenv()
 
@@ -278,6 +282,11 @@ with st.container():
                             progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
                             resume_search.index_document(f.name, text)
                             store_parsed_text(f.name, text)
+                            try:
+                                blob_url = get_blob_url(RESUME_CONTAINER, f.name)
+                                update_candidate_metadata(f.name, text, blob_url=blob_url)
+                            except Exception as e:
+                                logger.warning("candidate_metadata update skipped for %s: %s", f.name, e)
                         else:
                             errors.append(f"{f.name}: no text extracted")
                     except Exception as e:
