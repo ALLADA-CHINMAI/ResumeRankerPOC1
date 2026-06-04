@@ -93,6 +93,38 @@ def extract_jd_keywords(jd_text: str) -> str:
     return resp.choices[0].message.content
 
 
+@lru_cache(maxsize=64)
+def extract_jd_keywords_structured(jd_text: str) -> dict:
+    """
+    Extract category-wise keywords from a JD as a structured dict.
+    Cached separately from extract_jd_keywords so both can co-exist.
+    """
+    resp = get_openai_client().chat.completions.create(
+        model=OPENAI_DEPLOYMENT,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Extract key requirements from a job description and return JSON with exactly these keys:\n"
+                    '{"jobTitle": "string", '
+                    '"technicalSkills": ["short item", ...], '
+                    '"experience": "string", '
+                    '"certifications": ["short item", ...], '
+                    '"education": "string", '
+                    '"location": "string", '
+                    '"domain": "string"}\n'
+                    "Keep each list item short (1–4 words). Omit keys with no relevant information."
+                ),
+            },
+            {"role": "user", "content": jd_text},
+        ],
+        max_tokens=600,
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    return json.loads(resp.choices[0].message.content)
+
+
 def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> Optional[dict]:
     """Score a single resume against a JD. Returns None if content is not a valid resume."""
     for attempt in range(retries):

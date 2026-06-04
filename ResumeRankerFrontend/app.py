@@ -24,7 +24,7 @@ from ResumeRankerCore.storage import (
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, SCORE_MAX
+from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured, SCORE_MAX
 
 load_dotenv()
 
@@ -367,9 +367,88 @@ if rank_clicked:
                 st.link_button("Open JD ↗", get_blob_url(JD_CONTAINER, selected_jd))
             except Exception:
                 pass
+
         try:
-            jd_keywords = extract_jd_keywords(jd_text)
-            st.info(jd_keywords)
+            kw = extract_jd_keywords_structured(jd_text)
+
+            def _chips(items: list) -> str:
+                return " ".join(
+                    f'<span style="display:inline-block;background:#d0f5e8;color:#1a3c2b;'
+                    f'border:1px solid #6B7C3F;border-radius:12px;padding:2px 10px;'
+                    f'font-size:0.82rem;font-weight:600;margin:2px;">{item}</span>'
+                    for item in items
+                )
+
+            # Row 1: Job Title spanning full width
+            if kw.get("jobTitle"):
+                st.markdown(
+                    f'<div style="margin-bottom:10px;">'
+                    f'<span style="font-weight:700;color:{BLUE};font-size:0.85rem;">JOB TITLE &nbsp;</span>'
+                    f'<span style="font-size:1rem;font-weight:600;">{kw["jobTitle"]}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            # Row 2: Tech Skills (wide) + Experience
+            col_ts, col_exp = st.columns([3, 2])
+            with col_ts:
+                if kw.get("technicalSkills"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">TECHNICAL SKILLS</div>'
+                        f'{_chips(kw["technicalSkills"])}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+            with col_exp:
+                if kw.get("experience"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">EXPERIENCE</div>'
+                        f'<span style="font-size:0.9rem;">{kw["experience"]}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+            # Row 3: Certs | Education | Location | Domain
+            col_cert, col_edu, col_loc, col_dom = st.columns(4)
+            with col_cert:
+                if kw.get("certifications"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">CERTIFICATIONS</div>'
+                        f'{_chips(kw["certifications"])}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+            with col_edu:
+                if kw.get("education"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">EDUCATION</div>'
+                        f'<span style="font-size:0.9rem;">{kw["education"]}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+            with col_loc:
+                if kw.get("location"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">LOCATION</div>'
+                        f'<span style="font-size:0.9rem;">{kw["location"]}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+            with col_dom:
+                if kw.get("domain"):
+                    st.markdown(
+                        f'<div style="margin-bottom:10px;">'
+                        f'<div style="font-weight:700;color:{BLUE};font-size:0.8rem;margin-bottom:4px;">DOMAIN</div>'
+                        f'<span style="font-size:0.9rem;">{kw["domain"]}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
         except Exception as e:
             st.warning(f"Could not extract JD keywords: {e}")
 
