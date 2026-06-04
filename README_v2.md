@@ -90,23 +90,9 @@ pip install -r requirements.txt
 
 ---
 
-## How to Run the MCP Server
-
-```bash
-# From ResumeRankerPOC1/
-python -m ResumeRankerMCP.main --transport http --port 8000
-# Clients connect to: http://localhost:8000/sse
-```
-
 ### Environment variables
+No Changes
 
-The MCP server uses the same `.env` file as the Streamlit UI. One optional addition:
-
-```env
-LOG_LEVEL=INFO   # DEBUG | INFO | WARNING | ERROR
-```
-
----
 
 ## How to Test
 
@@ -149,19 +135,3 @@ npx @modelcontextprotocol/inspector http://localhost:8000/sse
 ```
 
 Opens a browser UI at `http://localhost:5173` where you can browse all tools, fill in arguments, and call them interactively — no client code needed.
-
----
-
-## Architecture Notes
-
-- **No ingestion via MCP** — Resumes and JDs are uploaded through the Streamlit UI. The MCP server is query-only.
-- **Docstrings = tool descriptions** — FastMCP converts each function's docstring into the `description` field the agent reads from `tools/list`. The docstrings include usage examples so the agent can select the right tool.
-- **Cost cap** — `rank_candidates_for_job` uses the same two-stage pipeline as the Streamlit UI: GPT-4o is only called on the top 15 candidates from hybrid search, regardless of corpus size.
-- **Python 3.10+ scoped** — Only `ResumeRankerMCP/` requires Python 3.10+. `ResumeRankerCore` and `ResumeRankerFrontend` are unchanged.
-
----
-
-## Next Steps
-
-- UI improvements to `ResumeRankerFrontend/app.py` (planned)
-- Additional MCP tools as new use cases emerge

@@ -23,7 +23,7 @@ from ResumeRankerCore.storage import (
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCore.ranking import rank_resumes, SCORE_MAX
+from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, SCORE_MAX
 
 load_dotenv()
 
@@ -346,6 +346,14 @@ if rank_clicked:
             for i, r in enumerate(results)
         ]
         st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+
+        st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">JD Keywords (extracted by OpenAI)</div>', unsafe_allow_html=True)
+        try:
+            jd_keywords = extract_jd_keywords(jd_text)
+            st.info(jd_keywords)
+        except Exception as e:
+            st.warning(f"Could not extract JD keywords: {e}")
 
         st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Score Breakdown</div>', unsafe_allow_html=True)
