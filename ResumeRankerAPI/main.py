@@ -5,10 +5,10 @@ Run locally:
     uvicorn ResumeRankerAPI.main:app --host 0.0.0.0 --port 8000
 
 Endpoints:
-    POST /rank  — rank existing indexed resumes against a JD identified by req_id
+    POST /rankResumes  — rank existing indexed resumes against a JD identified by req_id
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -26,7 +26,6 @@ app = FastAPI(title="ResumeRanker API", version="1.0.0")
 class RankRequest(BaseModel):
     req_id: str
     top_k: int = 10
-    candidate_names: Optional[List[str]] = None
 
 
 class CandidateResult(BaseModel):
@@ -48,7 +47,7 @@ class RankResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/rank", response_model=RankResponse)
+@app.post("/rankResumes", response_model=RankResponse)
 def rank(request: RankRequest):
     jd_search = get_jd_search()
 
@@ -71,8 +70,7 @@ def rank(request: RankRequest):
     except Exception:
         jd_keywords = {}
 
-    selected = request.candidate_names if request.candidate_names else None
-    raw_results = rank_resumes(jd_text, top_n=request.top_k, selected_resumes=selected)
+    raw_results = rank_resumes(jd_text, top_n=request.top_k)
 
     results = [
         CandidateResult(
