@@ -13,9 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import List, Optional
 
-from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCore.config import get_score_system, get_score_max
-from ResumeRankerCore.storage import fetch_parsed_text
+from ResumeRankerCommon.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerCommon.config import get_score_system, get_score_max
+from ResumeRankerCommon.models import RankedCandidate
+from ResumeRankerCommon.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ def rank_resumes(
     selected_resumes: Optional[List[str]] = None,
     search_top: int = 25,
     on_progress: Optional[callable] = None,
-) -> List[dict]:
+) -> List[RankedCandidate]:
     """
     Rank resumes against a job description.
 
@@ -225,7 +226,7 @@ def rank_resumes(
         if result is None:
             return None
         return {
-            "name": name,
+            "candidate_name": name,
             "total_score": result["totalScore"],
             "scores": result.get("scores", {}),
             "reasons": result.get("scoringReasons", {}),

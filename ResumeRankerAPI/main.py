@@ -13,8 +13,9 @@ from typing import Dict, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from ResumeRankerCore.clients import get_jd_search
-from ResumeRankerCore.ranking import extract_jd_keywords_structured, rank_resumes
+from ResumeRankerCommon.clients import get_jd_search
+from ResumeRankerCommon.models import RankedCandidate
+from ResumeRankerCommon.ranking import extract_jd_keywords_structured, rank_resumes
 
 app = FastAPI(title="ResumeRanker API", version="1.0.0")
 
@@ -28,12 +29,8 @@ class RankRequest(BaseModel):
     top_k: int = 10
 
 
-class CandidateResult(BaseModel):
+class CandidateResult(RankedCandidate):
     rank: int
-    name: str
-    total_score: float
-    scores: Dict[str, float]
-    reasons: Dict[str, str]
 
 
 class RankResponse(BaseModel):
@@ -73,13 +70,7 @@ def rank(request: RankRequest):
     raw_results = rank_resumes(jd_text, top_n=request.top_k)
 
     results = [
-        CandidateResult(
-            rank=i + 1,
-            name=r["name"],
-            total_score=r["total_score"],
-            scores=r.get("scores", {}),
-            reasons=r.get("reasons", {}),
-        )
+        CandidateResult(rank=i + 1, **r)
         for i, r in enumerate(raw_results)
     ]
 

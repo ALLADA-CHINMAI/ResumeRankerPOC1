@@ -21,7 +21,7 @@ from azure.search.documents.indexes.models import (
 )
 from azure.core.credentials import AzureKeyCredential
 
-from ResumeRankerCore.text_utils import chunk_text
+from ResumeRankerCommon.text_utils import chunk_text
 
 logger = logging.getLogger(__name__)
 

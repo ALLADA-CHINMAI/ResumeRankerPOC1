@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from ResumeRankerCore.clients import validate_config
+from ResumeRankerCommon.clients import validate_config
 
 SAMPLE_JD = """
 We are looking for a Senior Software Engineer with 5+ years of professional

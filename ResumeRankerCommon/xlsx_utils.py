@@ -18,7 +18,7 @@ from typing import Optional
 
 import openpyxl
 
-from ResumeRankerCore.clients import get_openai_client, OPENAI_DEPLOYMENT
+from ResumeRankerCommon.clients import get_openai_client, OPENAI_DEPLOYMENT
 
 logger = logging.getLogger(__name__)
 

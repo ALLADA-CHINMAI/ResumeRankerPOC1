@@ -23,14 +23,14 @@ import os
 import argparse
 import logging
 
-# Project root on sys.path so ResumeRankerCore is importable from any cwd.
-# Must come before any ResumeRankerCore imports.
+# Project root on sys.path so ResumeRankerCommon is importable from any cwd.
+# Must come before any ResumeRankerCommon imports.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Trigger tiktoken tokenizer download BEFORE stdio protocol loop opens.
 # tiktoken prints to stdout on first use, which corrupts the MCP stdio stream.
 try:
-    from ResumeRankerCore.text_utils import chunk_text as _warmup
+    from ResumeRankerCommon.text_utils import chunk_text as _warmup
     _warmup("")
 except Exception:
     pass
@@ -38,7 +38,7 @@ except Exception:
 from fastmcp import FastMCP
 from dotenv import load_dotenv
 
-from ResumeRankerCore.clients import validate_config
+from ResumeRankerCommon.clients import validate_config
 from ResumeRankerMCP.server_config import configure_logging
 
 from ResumeRankerMCP.tools.catalog import list_candidates, list_job_descriptions
@@ -53,16 +53,13 @@ mcp = FastMCP(
     name="ResumeRanker",
     version="1.0.0",
     instructions=(
-        "Azure-backed resume query engine for enterprise candidate screening.\n\n"
-        "Typical workflow:\n"
-        "1. list_candidates() — see what resumes are in the system\n"
-        "2. search_candidates(query) — fast hybrid search to find relevant candidates\n"
-        "3. rank_candidates_for_job(jd_text) — GPT-4o 6-dimension scoring (100 pts total)\n"
-        "4. get_candidate_profile(name) — structured extraction of skills, experience, certs\n"
-        "5. analyze_skill_gaps(jd_text, name) — strengths, gaps, hire/no-hire recommendation\n"
-        "6. compare_candidates(jd_text, names) — side-by-side scoring of specific candidates\n\n"
-        "Scoring rubric: experience/35 + technicalSkills/40 + certifications/5 + "
-        "education/5 + location/5 + domainFit/10 = 100 total."
+        "Azure-backed resume query engine. Typical workflow:\n"
+        "1. list_candidates — discover available resumes\n"
+        "2. search_candidates(query) — fast hybrid search\n"
+        "3. rank_candidates_for_job(jd_text) — GPT-4o scoring\n"
+        "4. get_candidate_profile(name) — structured extraction\n"
+        "5. analyze_skill_gaps(jd_text, name) — strengths/gaps/recommendation\n"
+        "6. compare_candidates(jd_text, names) — side-by-side scoring"
     ),
 )
 

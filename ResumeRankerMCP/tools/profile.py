@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 from typing import Dict
 
-from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCore.storage import fetch_parsed_text
+from ResumeRankerCommon.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerCommon.models import CandidateProfile, SkillGapAnalysis
+from ResumeRankerCommon.storage import fetch_parsed_text
 
 _PROFILE_SYSTEM = """
 Extract a structured candidate profile from the resume provided. Return ONLY valid JSON with exactly these fields:
@@ -52,36 +53,12 @@ def _get_resume_text(candidate_name: str) -> str:
 
 def get_candidate_profile(candidate_name: str) -> Dict:
     """
-    Extract a structured intelligence profile from a candidate's resume using GPT-4o.
-
-    Use this to quickly understand a candidate without reading the full resume, or
-    to build structured comparisons across multiple candidates. Returns enterprise-
-    standard candidate data: experience level, title, skills, certs, education, domain.
-
-    Examples of when to use:
-    - "What are Alice Jones's key skills and years of experience?"
-    - "Give me a structured profile of candidate john_smith.pdf"
-    - "What domain expertise does this candidate have?"
-    - "Build profiles for these 3 candidates so I can compare them"
+    Extract structured profile from a resume using GPT-4o.
+    Returns: years_of_experience, current_or_recent_title, key_skills, certifications,
+             education, domain_expertise, location, summary.
 
     Args:
-        candidate_name: Exact resume filename as returned by list_candidates.
-                        E.g. "john_smith.pdf" or "alice_jones.docx"
-
-    Returns:
-        Dict with:
-          - candidate_name (str): The filename (echoed for reference)
-          - years_of_experience (int): Total estimated years of work experience
-          - current_or_recent_title (str): Most recent job title
-          - key_skills (list[str]): Top 10 specific technical and domain skills
-          - certifications (list[str]): All certifications mentioned (empty if none)
-          - education (str): Highest degree and field
-          - domain_expertise (list[str]): Industries/domains they have worked in
-          - location (str): Location if mentioned, else "Not specified"
-          - summary (str): 2-sentence professional summary
-
-    Raises:
-        ValueError: If candidate_name is not found in the system.
+        candidate_name: Exact resume filename from list_candidates.
     """
     resume_text = _get_resume_text(candidate_name)
     if not resume_text or not resume_text.strip():
@@ -100,40 +77,18 @@ def get_candidate_profile(candidate_name: str) -> Dict:
         temperature=0,
         response_format={"type": "json_object"},
     )
-    profile = json.loads(resp.choices[0].message.content)
-    profile["candidate_name"] = candidate_name
-    return profile
+    raw = json.loads(resp.choices[0].message.content)
+    return CandidateProfile(candidate_name=candidate_name, **raw).model_dump()
 
 
 def analyze_skill_gaps(jd_text: str, candidate_name: str) -> Dict:
     """
-    Analyze a candidate's skill gaps against a job description using GPT-4o.
-
-    Use this to deep-dive on a specific candidate after ranking, or to build
-    objective justifications for hiring decisions. Returns what the candidate
-    has (strengths), what's missing (gaps with severity), and a recommendation.
-
-    Examples of when to use:
-    - "Why didn't Alice Jones score higher — what's she missing?"
-    - "What skills gaps does john_smith.pdf have for this DevOps role?"
-    - "Give me a hire/no-hire analysis for this candidate"
-    - "What training would candidate X need to be ready for this role?"
+    Compare a candidate's resume against a JD using GPT-4o.
+    Returns: match_score (0-100), strengths, gaps (skill/importance/notes), recommendation.
 
     Args:
-        jd_text:        Full text of the job description or requirements.
-        candidate_name: Exact resume filename as returned by list_candidates.
-
-    Returns:
-        Dict with:
-          - candidate_name (str): The filename (echoed for reference)
-          - match_score (int): 0-100 overall fit percentage
-          - strengths (list[str]): Top 3-5 things candidate has that JD requires
-          - gaps (list[dict]): Missing/weak areas, each with:
-              {skill, importance (critical/important/nice-to-have), notes}
-          - recommendation (str): One-sentence hire/no-hire/consider with rationale
-
-    Raises:
-        ValueError: If candidate_name is not found in the system.
+        jd_text: Full job description text.
+        candidate_name: Exact resume filename from list_candidates.
     """
     resume_text = _get_resume_text(candidate_name)
     if not resume_text or not resume_text.strip():
@@ -158,6 +113,5 @@ def analyze_skill_gaps(jd_text: str, candidate_name: str) -> Dict:
         temperature=0,
         response_format={"type": "json_object"},
     )
-    result = json.loads(resp.choices[0].message.content)
-    result["candidate_name"] = candidate_name
-    return result
+    raw = json.loads(resp.choices[0].message.content)
+    return SkillGapAnalysis(candidate_name=candidate_name, **raw).model_dump()

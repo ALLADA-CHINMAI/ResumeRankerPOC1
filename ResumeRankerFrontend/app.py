@@ -1,12 +1,12 @@
 """
-Streamlit UI — thin shell. All business logic lives in ResumeRankerCore/.
+Streamlit UI — thin shell. All business logic lives in ResumeRankerCommon/.
 Run from the project root:  streamlit run ResumeRankerFrontend\app.py
 """
 
 import sys
 import os
 
-# Ensure project root is on sys.path so 'ResumeRankerCore' is importable.
+# Ensure project root is on sys.path so 'ResumeRankerCommon' is importable.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
@@ -17,9 +17,9 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-from ResumeRankerCore.clients import validate_config, get_resume_search, get_jd_search
-from ResumeRankerCore.text_utils import extract_text
-from ResumeRankerCore.storage import (
+from ResumeRankerCommon.clients import validate_config, get_resume_search, get_jd_search
+from ResumeRankerCommon.text_utils import extract_text
+from ResumeRankerCommon.storage import (
     list_blobs,
     fetch_blob,
     upload_blob,
@@ -28,9 +28,9 @@ from ResumeRankerCore.storage import (
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
-from ResumeRankerCore.config import get_score_max
-from ResumeRankerCore.xlsx_utils import update_candidate_metadata
+from ResumeRankerCommon.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
+from ResumeRankerCommon.config import get_score_max
+from ResumeRankerCommon.xlsx_utils import update_candidate_metadata
 
 load_dotenv()
 
@@ -411,9 +411,9 @@ if rank_clicked:
         table_rows = [
             {
                 "Rank": i + 1,
-                "Resume": r["name"],
+                "Resume": r["candidate_name"],
                 "Score": f"{r['total_score']:.1f} / 100",
-                "Link": get_blob_url(RESUME_CONTAINER, r["name"]),
+                "Link": get_blob_url(RESUME_CONTAINER, r["candidate_name"]),
             }
             for i, r in enumerate(results)
         ]

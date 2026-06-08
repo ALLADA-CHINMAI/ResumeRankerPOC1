@@ -24,7 +24,7 @@ Resume Ranker is an intelligent resume evaluation system that leverages Azure Op
 - **Session Caching** — Resumes and embeddings are cached for fast re-ranking with different job descriptions
 
 ### Technical Capabilities
-- **Modular Architecture** — Clean separation between business logic (`ResumeRankerCore`) and presentation layer (`ResumeRankerFrontend`)
+- **Modular Architecture** — Clean separation between business logic (`ResumeRankerCommon`) and presentation layer (`ResumeRankerFrontend`)
 - **Enterprise Auth Support** — Azure AD token-based authentication with automatic token refresh for API Management/gateway scenarios
 - **Auto-Scaling** — Parallelized GPT-4o scoring calls via ThreadPoolExecutor; configurable concurrency
 - **Chunking Strategy** — Token-aware text splitting (400 tokens/chunk, 60-token overlap) preserves context across chunk boundaries
@@ -48,7 +48,7 @@ Resume Ranker is an intelligent resume evaluation system that leverages Azure Op
                               │
                               ▼
 ┌───────────────────────────────────────────────────────────────────────┐
-│                       ResumeRankerCore                                │
+│                       ResumeRankerCommon                                │
 │                    (Business Logic Layer)                             │
 │                                                                       │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌────────────┐│
@@ -95,7 +95,7 @@ Resume Ranker is an intelligent resume evaluation system that leverages Azure Op
   - Responsive 100% width layout with minimal margins
   - Custom Providence Health branding (blue/olive color scheme)
 
-#### 2. **ResumeRankerCore** (Business Logic Layer)
+#### 2. **ResumeRankerCommon** (Business Logic Layer)
 
 **clients.py** — Singleton clients for Azure services
 - Lazy-initialized OpenAI client with automatic Azure AD token refresh
@@ -471,7 +471,7 @@ The Azure Cognitive Search index (`resume_chunks`) is **auto-created on first ru
 
 ```
 resumeRanking/
-├── ResumeRankerCore/           # Business logic layer (no Streamlit deps)
+├── ResumeRankerCommon/           # Business logic layer (no Streamlit deps)
 │   ├── __init__.py
 │   ├── clients.py              # Azure OpenAI, Blob, Auth clients
 │   ├── storage.py              # Blob CRUD operations
@@ -500,7 +500,7 @@ resumeRanking/
 ### **Execution policy error when activating venv**
 **Solution:** Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` (no admin needed)
 
-### **`ModuleNotFoundError: No module named 'ResumeRankerCore'`**
+### **`ModuleNotFoundError: No module named 'ResumeRankerCommon'`**
 **Cause:** Running from wrong directory  
 **Solution:** Always run `streamlit run ResumeRankerFrontend\app.py` from the `resumeRanking` root directory
 

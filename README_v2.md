@@ -6,7 +6,7 @@ This document covers what was added in v2. For the original setup, architecture,
 
 ## What's New in v2
 
-A **Model Context Protocol (MCP) server** has been added as a new module alongside the existing Streamlit UI. It exposes the `ResumeRankerCore` business logic as structured tools that any MCP-compatible AI agent can call — including **GitHub Copilot (VSCode Agent mode)**, **Claude Desktop**, or custom agents.
+A **Model Context Protocol (MCP) server** has been added as a new module alongside the existing Streamlit UI. It exposes the `ResumeRankerCommon` business logic as structured tools that any MCP-compatible AI agent can call — including **GitHub Copilot (VSCode Agent mode)**, **Claude Desktop**, or custom agents.
 
 The Streamlit UI is **untouched**. The MCP server is purely additive.
 

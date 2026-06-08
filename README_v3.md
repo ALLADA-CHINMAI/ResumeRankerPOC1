@@ -16,7 +16,7 @@ The ranking pipeline and MCP server are **untouched**. This is purely additive.
 
 ```
 ResumeRankerPOC1/
-├── ResumeRankerCore/
+├── ResumeRankerCommon/
 │   └── xlsx_utils.py              ← New: metadata upsert helper
 ├── ResumeRankerFrontend/
 │   └── app.py                     ← Updated: calls helper after indexing
@@ -141,7 +141,7 @@ Include each candidate's interview history as a scoring signal in Stage 2 GPT ra
 
 ### 1. New Scoring Dimension — `interviewHistory` (max 15 pts)
 
-Add a seventh dimension to the existing rubric in `ResumeRankerCore/ranking.py`:
+Add a seventh dimension to the existing rubric in `ResumeRankerCommon/ranking.py`:
 
 | New Dimension | Max | What it evaluates |
 |---|---|---|
@@ -195,8 +195,8 @@ Returns the full interview history for a candidate (identified by resume filenam
 
 | File | Change |
 |---|---|
-| `ResumeRankerCore/ranking.py` | Add `interviewHistory` to `SCORE_MAX`; inject summary block into Stage 2 prompt; call `load_interview_summary_by_doc` |
-| `ResumeRankerCore/xlsx_utils.py` | Add `load_interview_summary_by_doc(doc_name)` lookup helper |
+| `ResumeRankerCommon/ranking.py` | Add `interviewHistory` to `SCORE_MAX`; inject summary block into Stage 2 prompt; call `load_interview_summary_by_doc` |
+| `ResumeRankerCommon/xlsx_utils.py` | Add `load_interview_summary_by_doc(doc_name)` lookup helper |
 | `ResumeRankerMCP/tools/profile.py` | Add `get_candidate_interview_history` tool |
 | `ResumeRankerMCP/main.py` | Register the new tool |
 | `ResumeRankerFrontend/app.py` | Update `_KEY_LABELS` and `SCORE_MAX` references to include `interviewHistory` |
