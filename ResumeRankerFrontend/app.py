@@ -30,6 +30,13 @@ from ResumeRankerCore.storage import (
 )
 from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
 from ResumeRankerCore.config import get_score_max
+from ResumeRankerCore.requisitions import (
+    list_requisitions,
+    create_requisition,
+    validate_req_id,
+    req_id_exists,
+    get_jd_text_by_req,
+)
 from ResumeRankerCore.xlsx_utils import update_candidate_metadata
 
 load_dotenv()
@@ -96,12 +103,13 @@ with st.spinner("Initializing Resume Ranker resources..."):
     resume_search, jd_search = _init()
 
 # ---------------------------------------------------------------------------
-# Cached blob listings — avoids Azure round-trip on every widget interaction
+# Cached requisitions and resumes — avoids repeated Azure round-trips
 # ---------------------------------------------------------------------------
 
 @st.cache_data(ttl=30)
-def _list_jds():
-    return list_blobs(JD_CONTAINER)
+def _list_requisitions():
+    """Load all active requisitions, return as list of {req_id, title} dicts."""
+    return list_requisitions(status="active")
 
 
 @st.cache_data(ttl=30)
@@ -239,30 +247,55 @@ with st.container():
     with st.expander("📤 Upload New Job Descriptions & Resumes", expanded=True):
         up_col1, up_col2 = st.columns(2, gap="large")
         with up_col1:
-            st.markdown('<div class="section-title">Upload New Job Descriptions</div>', unsafe_allow_html=True)
-            jd_files = st.file_uploader(
-                "Select JD files (.txt, .pdf, .docx)",
-                accept_multiple_files=True,
+            st.markdown('<div class="section-title">Create New Requisition</div>', unsafe_allow_html=True)
+            req_id_input = st.text_input(
+                "Requisition ID (from HR/HRIS)",
+                placeholder="REQ-2024-12-001",
+                help="Format: REQ-YYYY-MM-NNN (e.g., REQ-2024-12-001)",
+                key="req_id_input",
+            )
+            job_title = st.text_input(
+                "Job Title",
+                placeholder="e.g., Senior Software Engineer",
+                key="job_title_input",
+            )
+            jd_file = st.file_uploader(
+                "Select JD file (.txt, .pdf, .docx)",
+                type=["txt", "pdf", "docx"],
                 key="jd_uploader",
             )
-            if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
-                errors = []
-                for f in jd_files:
-                    data = f.read()
-                    try:
-                        upload_blob(JD_CONTAINER, f.name, data)
-                        text = extract_text(f.name, data)
-                        if text.strip():
-                            jd_search.index_document(f.name, text)
-                        else:
-                            errors.append(f"{f.name}: no text extracted")
-                    except Exception as e:
-                        errors.append(f"{f.name}: {e}")
-                _list_jds.clear()  # refresh JD dropdown
-                _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
-                for err in errors:
-                    st.warning(err)
-                st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
+            if st.button("Create Requisition", disabled=not (req_id_input and job_title and jd_file), key="btn_upload_jd"):
+                try:
+                    # Validate reqID format
+                    if not validate_req_id(req_id_input):
+                        st.error(f"❌ Invalid reqID format: '{req_id_input}'. Must match REQ-YYYY-MM-NNN")
+                    elif req_id_exists(req_id_input):
+                        st.error(f"❌ Requisition '{req_id_input}' already exists.")
+                    else:
+                        # Create requisition
+                        file_ext = jd_file.name.split(".")[-1].lower()
+                        jd_data = jd_file.read()
+                        
+                        req = create_requisition(
+                            req_id=req_id_input,
+                            title=job_title,
+                            jd_file_contents=jd_data,
+                            user_id="streamlit_user",  # placeholder; replace with actual user
+                            file_extension=file_ext,
+                        )
+                        
+                        # Index the JD for hybrid search
+                        jd_text = extract_text(jd_file.name, jd_data)
+                        if jd_text.strip():
+                            jd_search.index_document(req_id_input, jd_text)
+                        
+                        # Clear cache and show success
+                        _list_requisitions.clear()
+                        st.success(f"✅ Created requisition {req_id_input} - {job_title}")
+                        st.balloons()
+                except Exception as e:
+                    st.error(f"❌ Error creating requisition: {e}")
+
         with up_col2:
             st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
             resume_files = st.file_uploader(
@@ -294,8 +327,7 @@ with st.container():
                         errors.append(f"{f.name}: {e}")
                     progress.progress((idx + 1) / len(resume_files))
                 progress.empty()
-                _list_resumes.clear()  # refresh resume list
-                _list_jds.clear()      # also clear JD cache in case resumes affect downstream logic
+                _list_resumes.clear()
                 for err in errors:
                     st.warning(err)
                 st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
@@ -308,26 +340,30 @@ st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
 with st.container():
     with st.expander("📊 Rank Resumes Against a Job Description", expanded=True):
         col1, col2 = st.columns(2, gap="large")
-        selected_jd = None
+        selected_req_id = None
         all_resumes: list = []
         selected_resumes: list = []
         with col1:
-            st.markdown('<div class="section-title">Select Job Description</div>', unsafe_allow_html=True)
-            with st.spinner("Loading job descriptions…"):
+            st.markdown('<div class="section-title">Select Requisition</div>', unsafe_allow_html=True)
+            with st.spinner("Loading requisitions…"):
                 try:
-                    jd_list = _list_jds()
+                    requisitions = _list_requisitions()
                 except Exception as e:
-                    jd_list = []
-                    st.warning(f"Could not list job descriptions: {e}")
-            if not jd_list:
-                st.info("No job descriptions found. Upload a JD above first.")
+                    requisitions = []
+                    st.warning(f"Could not list requisitions: {e}")
+            if not requisitions:
+                st.info("No requisitions found. Create one above first.")
             else:
-                selected_jd = st.selectbox(
-                    "Job Description",
-                    jd_list,
-                    key="jd_select",
+                # Format requisitions for dropdown display
+                req_display = {f"{r['req_id']} — {r['title']}": r['req_id'] for r in requisitions}
+                selected_display = st.selectbox(
+                    "Requisition",
+                    options=req_display.keys(),
+                    key="req_select",
                     label_visibility="collapsed",
                 )
+                if selected_display:
+                    selected_req_id = req_display[selected_display]
         with col2:
             st.markdown('<div class="section-title">Select Resumes to Rank</div>', unsafe_allow_html=True)
             with st.spinner("Loading resumes…"):
@@ -354,15 +390,14 @@ with st.container():
 
 # Minimum space between sections and button
 st.markdown('<div style="height:2px;"></div>', unsafe_allow_html=True)
-can_rank = bool('selected_jd' in locals() and 'selected_resumes' in locals() and selected_jd and selected_resumes)
+can_rank = bool('selected_req_id' in locals() and 'selected_resumes' in locals() and selected_req_id and selected_resumes)
 st.markdown('<div class="rank-btn" style="width:100%;display:flex;justify-content:center;margin-top:-2px;margin-bottom:2px;">', unsafe_allow_html=True)
 rank_clicked = st.button("Rank Resumes →", disabled=not can_rank, key="btn_rank_main")
 st.markdown('</div>', unsafe_allow_html=True)
 
 if rank_clicked:
     try:
-        jd_data = fetch_blob(JD_CONTAINER, selected_jd)
-        jd_text = extract_text(selected_jd, jd_data)
+        jd_text = get_jd_text_by_req(selected_req_id)
     except Exception as e:
         st.error(f"Failed to load job description: {e}")
         st.stop()
@@ -392,7 +427,10 @@ if rank_clicked:
     if not results:
         st.warning("No resumes could be scored. Check that resumes are indexed in the Upload section.")
     else:
-        st.success(f"Top {len(results)} candidates for **{selected_jd}**")
+        # Get requisition title for display
+        req_info = [r for r in requisitions if r['req_id'] == selected_req_id]
+        req_title = req_info[0]['title'] if req_info else selected_req_id
+        st.success(f"Top {len(results)} candidates for **{selected_req_id} — {req_title}**")
 
         table_rows = [
             {

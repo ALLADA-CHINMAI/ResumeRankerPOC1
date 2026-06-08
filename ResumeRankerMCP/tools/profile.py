@@ -11,6 +11,7 @@ import json
 from typing import Dict
 
 from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerCore.requisitions import get_jd_text_by_req
 from ResumeRankerCore.storage import fetch_parsed_text
 
 _PROFILE_SYSTEM = """
@@ -105,22 +106,22 @@ def get_candidate_profile(candidate_name: str) -> Dict:
     return profile
 
 
-def analyze_skill_gaps(jd_text: str, candidate_name: str) -> Dict:
+def analyze_skill_gaps(req_id: str, candidate_name: str) -> Dict:
     """
-    Analyze a candidate's skill gaps against a job description using GPT-4o.
+    Analyze a candidate's skill gaps against a job requisition using GPT-4o.
 
     Use this to deep-dive on a specific candidate after ranking, or to build
     objective justifications for hiring decisions. Returns what the candidate
     has (strengths), what's missing (gaps with severity), and a recommendation.
 
     Examples of when to use:
-    - "Why didn't Alice Jones score higher — what's she missing?"
-    - "What skills gaps does john_smith.pdf have for this DevOps role?"
-    - "Give me a hire/no-hire analysis for this candidate"
+    - "Why didn't Alice Jones score higher for REQ-2024-12-001?"
+    - "What skills gaps does john_smith.pdf have for REQ-2024-12-003?"
+    - "Give me a hire/no-hire analysis for this candidate against REQ-2024-12-002"
     - "What training would candidate X need to be ready for this role?"
 
     Args:
-        jd_text:        Full text of the job description or requirements.
+        req_id:         Requisition ID (e.g., "REQ-2024-12-001") — identifies the JD.
         candidate_name: Exact resume filename as returned by list_candidates.
 
     Returns:
@@ -133,7 +134,7 @@ def analyze_skill_gaps(jd_text: str, candidate_name: str) -> Dict:
           - recommendation (str): One-sentence hire/no-hire/consider with rationale
 
     Raises:
-        ValueError: If candidate_name is not found in the system.
+        ValueError: If candidate_name or requisition not found in the system.
     """
     resume_text = _get_resume_text(candidate_name)
     if not resume_text or not resume_text.strip():
@@ -141,6 +142,8 @@ def analyze_skill_gaps(jd_text: str, candidate_name: str) -> Dict:
             f"No resume text found for '{candidate_name}'. "
             "Use list_candidates() to verify the filename."
         )
+
+    jd_text = get_jd_text_by_req(req_id)
 
     resp = get_openai_client().chat.completions.create(
         model=OPENAI_DEPLOYMENT,

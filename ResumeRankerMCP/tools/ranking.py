@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import List, Dict, Optional
 
 from ResumeRankerCore.ranking import rank_resumes
+from ResumeRankerCore.requisitions import get_jd_text_by_req
 from ResumeRankerCore.clients import get_resume_search
 
 
@@ -22,18 +23,18 @@ def _normalize(results: List[Dict]) -> List[Dict]:
 
 
 def rank_candidates_for_job(
-    jd_text: str,
+    req_id: str,
     top_k: int = 10,
     candidate_names: Optional[List[str]] = None,
 ) -> List[Dict]:
     """
-    Rank candidates against a job description using GPT-4o (6-dimension scoring).
+    Rank candidates against a job requisition using GPT-4o (6-dimension scoring).
 
     Use this as the primary tool when you need to find the best-fit candidates
     for a role. Examples:
-    - "Top 5 candidates for a senior Python engineer role requiring 5+ years"
-    - "Best matches for a data scientist position with ML experience"
-    - "Who fits best for a DevOps role requiring AWS and Kubernetes?"
+    - "Top 5 candidates for REQ-2024-12-001 (senior Python engineer)"
+    - "Best matches for REQ-2024-12-002 (data scientist)"
+    - "Who fits best for REQ-2024-12-003 (DevOps engineer)?"
 
     Two-stage pipeline for cost efficiency:
       Stage 1 — Azure hybrid search (BM25 + vector) finds top 15 candidates (free)
@@ -49,8 +50,7 @@ def rank_candidates_for_job(
       domainFit       (10 pts): Industry/domain alignment
 
     Args:
-        jd_text:         Full text of the job description or requirements.
-                         Can be a formal JD or a plain requirements list.
+        req_id:          Requisition ID (e.g., "REQ-2024-12-001") — identifies the JD.
         top_k:           Number of ranked results to return (default 10).
         candidate_names: Optional list of exact resume filenames to restrict
                          ranking to a specific subset. Pass None to rank all
@@ -64,7 +64,11 @@ def rank_candidates_for_job(
               {experience, technicalSkills, certifications, education,
                location, domainFit}
           - reasons (dict): GPT-4o explanation for each dimension score
+
+    Raises:
+        ValueError: If requisition not found.
     """
+    jd_text = get_jd_text_by_req(req_id)
     results = rank_resumes(
         jd_text,
         top_n=top_k,
@@ -74,23 +78,23 @@ def rank_candidates_for_job(
 
 
 def compare_candidates(
-    jd_text: str,
+    req_id: str,
     candidate_names: List[str],
 ) -> List[Dict]:
     """
-    Score and rank a specific set of candidates side-by-side for a role.
+    Score and rank a specific set of candidates side-by-side for a requisition.
 
     Use this when you already know which candidates to compare — e.g.:
-    - "Compare Alice Jones and John Smith for the senior Python role"
-    - "Score candidate_a.pdf vs candidate_b.pdf vs candidate_c.pdf"
-    - "Who is the better fit between these 3 candidates for this JD?"
+    - "Compare Alice Jones and John Smith for REQ-2024-12-001"
+    - "Score candidate_a.pdf vs candidate_b.pdf vs candidate_c.pdf for the Python role"
+    - "Who is the better fit between these 3 candidates for REQ-2024-12-002?"
 
     Unlike rank_candidates_for_job, this targets ONLY the named candidates
     (no corpus-wide search). All named candidates are scored with GPT-4o and
     returned ranked best-to-worst.
 
     Args:
-        jd_text:         Full text of the job description or requirements.
+        req_id:          Requisition ID (e.g., "REQ-2024-12-001") — identifies the JD.
         candidate_names: List of 2 or more exact resume filenames (as returned
                          by list_candidates). All must exist in the system.
 
@@ -99,8 +103,8 @@ def compare_candidates(
         Each entry: {candidate_name, total_score, scores, reasons}
 
     Raises:
-        ValueError: If fewer than 2 names are provided, or any name is not
-                    found in the indexed resume corpus.
+        ValueError: If fewer than 2 names are provided, requisition not found,
+                    or any candidate name is not found in the indexed resume corpus.
     """
     if len(candidate_names) < 2:
         raise ValueError("compare_candidates requires at least 2 candidate names.")
@@ -113,6 +117,7 @@ def compare_candidates(
             "Use list_candidates() to see valid filenames."
         )
 
+    jd_text = get_jd_text_by_req(req_id)
     results = rank_resumes(
         jd_text,
         top_n=len(candidate_names),
