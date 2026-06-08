@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import List, Dict, Optional
 
 from ResumeRankerCore.ranking import rank_resumes
-from ResumeRankerCore.requisitions import get_jd_text_by_req
+from ResumeRankerCore.storage import resolve_jd_blob, fetch_blob
+from ResumeRankerCore.text_utils import extract_text
 from ResumeRankerCore.clients import get_resume_search
 
 
@@ -68,7 +69,10 @@ def rank_candidates_for_job(
     Raises:
         ValueError: If requisition not found.
     """
-    jd_text = get_jd_text_by_req(req_id)
+    # Resolve req_id or blob name
+    blob_name = resolve_jd_blob(req_id)
+    jd_bytes = fetch_blob(JD_CONTAINER, blob_name)
+    jd_text = extract_text(blob_name, jd_bytes)
     results = rank_resumes(
         jd_text,
         top_n=top_k,

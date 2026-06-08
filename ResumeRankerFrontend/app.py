@@ -27,16 +27,13 @@ from ResumeRankerCore.storage import (
     get_blob_url,
     RESUME_CONTAINER,
     JD_CONTAINER,
+    list_jds_formatted,
+    get_next_jd_id,
+    resolve_jd_blob,
 )
 from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
 from ResumeRankerCore.config import get_score_max
-from ResumeRankerCore.requisitions import (
-    list_requisitions,
-    create_requisition,
-    validate_req_id,
-    req_id_exists,
-    get_jd_text_by_req,
-)
+# note: no external requisition metadata; JD IDs are 4-digit prefixes added to filenames on upload
 from ResumeRankerCore.xlsx_utils import update_candidate_metadata
 
 load_dotenv()
@@ -272,29 +269,54 @@ with st.container():
                     elif req_id_exists(req_id_input):
                         st.error(f"❌ Requisition '{req_id_input}' already exists.")
                     else:
-                        # Create requisition
+                        # Create JD with generated 4-digit prefix
                         file_ext = jd_file.name.split(".")[-1].lower()
                         jd_data = jd_file.read()
-                        
-                        req = create_requisition(
-                            req_id=req_id_input,
-                            title=job_title,
-                            jd_file_contents=jd_data,
-                            user_id="streamlit_user",  # placeholder; replace with actual user
-                            file_extension=file_ext,
-                        )
-                        
-                        # Index the JD for hybrid search
+                        next_id = get_next_jd_id()
+                        blob_name = f"{next_id}_{jd_file.name}"
+                        upload_blob(JD_CONTAINER, blob_name, jd_data)
+
+                        # Index the JD for hybrid search using the blob name as id
                         jd_text = extract_text(jd_file.name, jd_data)
                         if jd_text.strip():
-                            jd_search.index_document(req_id_input, jd_text)
-                        
+                            jd_search.index_document(blob_name, jd_text)
+
                         # Clear cache and show success
-                        _list_requisitions.clear()
-                        st.success(f"✅ Created requisition {req_id_input} - {job_title}")
+                        _list_jds.clear()
+                        st.success(f"✅ Uploaded {blob_name}")
                         st.balloons()
                 except Exception as e:
                     st.error(f"❌ Error creating requisition: {e}")
+
+            # ----- Bulk upload JDs (no CSV) -----
+            st.markdown("<div style='margin-top:14px;padding-top:10px;border-top:1px dashed #e6e9ef;'></div>", unsafe_allow_html=True)
+            st.markdown('<div style="font-weight:700;margin-top:8px;">Bulk Upload JDs (assigns incremental 4-digit IDs)</div>', unsafe_allow_html=True)
+            bulk_jd_files = st.file_uploader(
+                "Select multiple JD files (.txt, .pdf, .docx)",
+                accept_multiple_files=True,
+                type=["txt", "pdf", "docx"],
+                key="bulk_jd_files2",
+            )
+            if st.button("Upload & Create JDs", disabled=not bulk_jd_files, key="btn_bulk_create2"):
+                created = []
+                errors = []
+                for f in bulk_jd_files:
+                    try:
+                        data = f.read()
+                        next_id = get_next_jd_id()
+                        blob_name = f"{next_id}_{f.name}"
+                        upload_blob(JD_CONTAINER, blob_name, data)
+                        text = extract_text(f.name, data)
+                        if text.strip():
+                            jd_search.index_document(blob_name, text)
+                        created.append(blob_name)
+                    except Exception as e:
+                        errors.append({"file": f.name, "error": str(e)})
+
+                _list_jds.clear()
+                st.success(f"Created {len(created)} JDs; {len(errors)} errors")
+                for er in errors[:10]:
+                    st.warning(er)
 
         with up_col2:
             st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
@@ -397,7 +419,10 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 if rank_clicked:
     try:
-        jd_text = get_jd_text_by_req(selected_req_id)
+        # Resolve selected identifier (e.g., '0004(filename.pdf)') to blob name and fetch text
+        blob_name = resolve_jd_blob(selected_req_id)
+        jd_data = fetch_blob(JD_CONTAINER, blob_name)
+        jd_text = extract_text(blob_name, jd_data)
     except Exception as e:
         st.error(f"Failed to load job description: {e}")
         st.stop()

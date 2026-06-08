@@ -11,7 +11,8 @@ import json
 from typing import Dict
 
 from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCore.requisitions import get_jd_text_by_req
+from ResumeRankerCore.storage import resolve_jd_blob, fetch_blob
+from ResumeRankerCore.text_utils import extract_text
 from ResumeRankerCore.storage import fetch_parsed_text
 
 _PROFILE_SYSTEM = """
@@ -143,7 +144,9 @@ def analyze_skill_gaps(req_id: str, candidate_name: str) -> Dict:
             "Use list_candidates() to verify the filename."
         )
 
-    jd_text = get_jd_text_by_req(req_id)
+    blob_name = resolve_jd_blob(req_id)
+    jd_bytes = fetch_blob(JD_CONTAINER, blob_name)
+    jd_text = extract_text(blob_name, jd_bytes)
 
     resp = get_openai_client().chat.completions.create(
         model=OPENAI_DEPLOYMENT,

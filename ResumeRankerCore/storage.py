@@ -13,6 +13,7 @@ from typing import List
 from dotenv import load_dotenv
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 from ResumeRankerCore.clients import get_blob_service
+import re
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -45,6 +46,78 @@ def _ensure_container(name: str):
 def list_blobs(container: str) -> List[str]:
     """List all blob names in a container. Returns empty list if container is empty."""
     return [b.name for b in get_blob_service().get_container_client(container).list_blobs()]
+
+
+# ---------------------------------------------------------------------------
+# JD identifier helpers (simple 4-digit numeric prefix, no external metadata)
+# ---------------------------------------------------------------------------
+
+
+def _parse_jd_prefix(blob_name: str) -> int | None:
+    """If blob_name starts with a 4-digit prefix like '0004_', return int, else None."""
+    m = re.match(r"^(\d{4})_", blob_name)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def get_next_jd_id() -> str:
+    """Scan existing JD blobs and return the next zero-padded 4-digit id as a string."""
+    blobs = list_blobs(JD_CONTAINER)
+    max_id = 0
+    for b in blobs:
+        p = _parse_jd_prefix(b)
+        if p is not None and p > max_id:
+            max_id = p
+    next_id = max_id + 1
+    return f"{next_id:04d}"
+
+
+def list_jds_formatted() -> List[str]:
+    """Return a list of display strings for JDs like '0004(original.pdf)'."""
+    blobs = list_blobs(JD_CONTAINER)
+    formatted = []
+    for b in blobs:
+        p = _parse_jd_prefix(b)
+        if p is not None:
+            orig = b.split("_", 1)[1] if "_" in b else b
+            formatted.append(f"{p:04d}({orig})")
+        else:
+            # blob without prefix — show as-is
+            formatted.append(b)
+    return formatted
+
+
+def resolve_jd_blob(identifier: str) -> str:
+    """
+    Resolve an identifier (either a 4-digit id like '0004' or a blob name) to the actual JD blob name.
+    Raises ValueError if not found.
+    """
+    blobs = list_blobs(JD_CONTAINER)
+    # If exact match to blob name
+    if identifier in blobs:
+        return identifier
+    # If identifier formatted like '0004(original.pdf)', extract numeric prefix
+    m = re.match(r"^(\d{4})\(|^(\d{4})$", identifier)
+    id_num = None
+    if m:
+        id_num = m.group(1) or m.group(2)
+
+    if id_num:
+        prefix = f"{id_num}_"
+        for b in blobs:
+            if b.startswith(prefix):
+                return b
+
+    # Try to match by display string
+    for b in blobs:
+        if identifier == f"{b}":
+            return b
+
+    raise ValueError(f"JD not found for identifier: {identifier}")
 
 
 def fetch_blob(container: str, name: str) -> bytes:
