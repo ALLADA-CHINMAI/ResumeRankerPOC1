@@ -11,7 +11,7 @@ import json
 from typing import Dict
 
 from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCore.storage import resolve_jd_blob, fetch_blob
+from ResumeRankerCore.storage import resolve_jd_blob, fetch_blob, JD_CONTAINER
 from ResumeRankerCore.text_utils import extract_text
 from ResumeRankerCore.storage import fetch_parsed_text
 
@@ -107,22 +107,22 @@ def get_candidate_profile(candidate_name: str) -> Dict:
     return profile
 
 
-def analyze_skill_gaps(req_id: str, candidate_name: str) -> Dict:
+def analyze_skill_gaps(jd_identifier: str, candidate_name: str) -> Dict:
     """
-    Analyze a candidate's skill gaps against a job requisition using GPT-4o.
+    Analyze a candidate's skill gaps against a job description using GPT-4o.
 
     Use this to deep-dive on a specific candidate after ranking, or to build
     objective justifications for hiring decisions. Returns what the candidate
     has (strengths), what's missing (gaps with severity), and a recommendation.
 
     Examples of when to use:
-    - "Why didn't Alice Jones score higher for REQ-2024-12-001?"
-    - "What skills gaps does john_smith.pdf have for REQ-2024-12-003?"
-    - "Give me a hire/no-hire analysis for this candidate against REQ-2024-12-002"
+    - "Why didn't Alice Jones score higher for JD 0001?"
+    - "What skills gaps does john_smith.pdf have for JD 0003?"
+    - "Give me a hire/no-hire analysis for this candidate against JD 0002"
     - "What training would candidate X need to be ready for this role?"
 
     Args:
-        req_id:         Requisition ID (e.g., "REQ-2024-12-001") — identifies the JD.
+        jd_identifier:  JD identifier (e.g., "0001(filename.pdf)" or blob name) — identifies the JD.
         candidate_name: Exact resume filename as returned by list_candidates.
 
     Returns:
@@ -144,7 +144,7 @@ def analyze_skill_gaps(req_id: str, candidate_name: str) -> Dict:
             "Use list_candidates() to verify the filename."
         )
 
-    blob_name = resolve_jd_blob(req_id)
+    blob_name = resolve_jd_blob(jd_identifier)
     jd_bytes = fetch_blob(JD_CONTAINER, blob_name)
     jd_text = extract_text(blob_name, jd_bytes)
 
