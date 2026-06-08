@@ -28,7 +28,8 @@ from ResumeRankerCore.storage import (
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured, SCORE_MAX
+from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
+from ResumeRankerCore.config import get_score_max
 from ResumeRankerCore.xlsx_utils import update_candidate_metadata
 
 load_dotenv()
@@ -461,8 +462,9 @@ if rank_clicked:
 
         for i, r in enumerate(results):
             with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
-                cols = st.columns(len(SCORE_MAX))
-                for col, (key, max_pts) in zip(cols, SCORE_MAX.items()):
+                score_max = get_score_max()
+                cols = st.columns(len(score_max))
+                for col, (key, max_pts) in zip(cols, score_max.items()):
                     val = r["scores"].get(key, 0)
                     label = (
                         key.replace("technicalSkills", "Tech Skills")
@@ -475,7 +477,8 @@ if rank_clicked:
                     col.metric(label=label, value=f"{val} / {max_pts}")
 
                 st.markdown("**Scoring Reasons:**")
-                for key in SCORE_MAX:
+                score_max = get_score_max()
+                for key in score_max:
                     reason = r["reasons"].get(key, "")
                     if reason:
                         label = _KEY_LABELS.get(key, key.title())

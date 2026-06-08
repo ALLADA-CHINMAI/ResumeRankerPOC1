@@ -14,49 +14,37 @@ from functools import lru_cache
 from typing import List, Optional
 
 from ResumeRankerCore.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerCore.config import get_score_system, get_score_max
 from ResumeRankerCore.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Scoring rubric (prompt + category caps)
+# Scoring configuration (loaded from scoring_config.json)
 # ---------------------------------------------------------------------------
 
+# Cache SCORE_MAX at module load for quick access (loaded once on first use)
+_SCORE_MAX_CACHE = None
 
-_SCORE_SYSTEM = """
-You are an expert resume evaluator. For each resume, score the following categories, using only the information in the job description and the resume:
 
-experience (max 35): Total years and depth of relevant work experience for the job, including how well the candidate's roles and responsibilities match the job description.
-technicalSkills (max 40): Coverage and proficiency in the specific technical skills, tools, languages, or platforms required by the job description.
-certifications (max 5): If the job description explicitly requires or prefers certifications/licenses, score based on how well the candidate meets them. If the job description does NOT mention any certifications or licenses, award the full 5 points automatically.
-education (max 5): If the job description explicitly requires a specific degree, field, or education level, score based on how well the candidate meets it. If the job description does NOT mention any education requirements, award the full 5 points automatically.
-location (max 5): If the job description explicitly specifies a location, on-site requirement, or remote policy, score based on how well the candidate matches it. If the job description does NOT mention any location requirements, award the full 5 points automatically.
-domainFit (max 10): Alignment of the candidate's career history and industry/domain experience with the target job's field or sector, not location, not company, not organization just technical domain fit, Like did the candidate's experience align with the technical domain requirements of the job for all years of experience they have?.
-
-For each category, assign a score from 0 up to the max. Also provide a brief reason for each score. Return valid JSON with totalScore (sum of all categories), a 'scores' object, and a 'scoringReasons' object. In 'scoringReasons' object clearly provide why the score was assigned and why was it reduced if its less than the maximum score and at the end of reason mention if that's category is a full/partial/no match with the job description. Do not include markdown or extra text.
-For each entry in 'scoringReasons': begin with exactly one of these status words followed by a colon — 'Exceeds:', 'Aligned:', 'Partial:', or 'Didn\'t Meet:'. After the colon, describe what matched or exceeded the requirements. If any requirements were not satisfied, append a sentence starting with 'Not Met:' followed by what was missing or insufficient.
-"""
-
-# Maximum points per category — used for validation and UI display
-SCORE_MAX = {
-    "experience": 35,
-    "technicalSkills": 40,
-    "certifications": 5,
-    "education": 5,
-    "location": 5,
-    "domainFit": 10,
-}
+def _get_score_max_cached() -> dict:
+    """Get cached SCORE_MAX dict from config."""
+    global _SCORE_MAX_CACHE
+    if _SCORE_MAX_CACHE is None:
+        _SCORE_MAX_CACHE = get_score_max()
+    return _SCORE_MAX_CACHE
 
 
 def _scores_valid(result: dict) -> bool:
     """Ensure every category is within its cap and the sum matches totalScore."""
+    score_max = _get_score_max_cached()
     scores = result.get("scores", {})
-    for key, cap in SCORE_MAX.items():
+    for key, cap in score_max.items():
         val = scores.get(key)
         if val is None or not (0 <= float(val) <= cap):
             logger.warning("Invalid score for '%s': %s (max %s)", key, val, cap)
             return False
-    computed = sum(float(scores[k]) for k in SCORE_MAX)
+    computed = sum(float(scores[k]) for k in score_max)
     total = float(result.get("totalScore", -1))
     if abs(total - computed) > 1:
         logger.warning("totalScore %s does not match category sum %s", total, computed)
@@ -128,12 +116,13 @@ def extract_jd_keywords_structured(jd_text: str) -> dict:
 
 def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> Optional[dict]:
     """Score a single resume against a JD. Returns None if content is not a valid resume."""
+    score_system = get_score_system()
     for attempt in range(retries):
         try:
             resp = get_openai_client().chat.completions.create(
                 model=OPENAI_DEPLOYMENT,
                 messages=[
-                    {"role": "system", "content": _SCORE_SYSTEM},
+                    {"role": "system", "content": score_system},
                     {
                         "role": "user",
                         "content": (
