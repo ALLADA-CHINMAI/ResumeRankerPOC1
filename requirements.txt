@@ -11,6 +11,10 @@ openpyxl
 python-docx
 pdfplumber
 
+# SQL database (JD metadata table)
+sqlalchemy>=2.0.0
+pyodbc  # ODBC driver for Azure SQL / SQL Server; install ODBC Driver 18 separately
+
 # MCP server (requires Python 3.10+)
 fastmcp>=2.0.0
 uvicorn>=0.29.0

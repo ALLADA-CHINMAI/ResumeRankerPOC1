@@ -21,12 +21,15 @@ from ResumeRankerCore.clients import validate_config, get_resume_search, get_jd_
 from ResumeRankerCore.text_utils import extract_text
 from ResumeRankerCore.storage import (
     list_blobs,
-    fetch_blob,
     upload_blob,
     store_parsed_text,
     get_blob_url,
     RESUME_CONTAINER,
-    JD_CONTAINER,
+)
+from ResumeRankerCore.db import (
+    insert_jd,
+    list_jds as db_list_jds,
+    fetch_jd_by_req_id,
 )
 from ResumeRankerCore.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
 from ResumeRankerCore.config import get_score_max
@@ -101,7 +104,7 @@ with st.spinner("Initializing Resume Ranker resources..."):
 
 @st.cache_data(ttl=30)
 def _list_jds():
-    return list_blobs(JD_CONTAINER)
+    return [r['req_id'] for r in db_list_jds()]
 
 
 @st.cache_data(ttl=30)
@@ -247,10 +250,12 @@ with st.container():
             )
             if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
                 errors = []
+                uploaded_req_ids = []
                 for f in jd_files:
                     data = f.read()
                     try:
-                        upload_blob(JD_CONTAINER, f.name, data)
+                        req_id = insert_jd(f.name, data)
+                        uploaded_req_ids.append(req_id)
                         text = extract_text(f.name, data)
                         if text.strip():
                             jd_search.index_document(f.name, text)
@@ -259,10 +264,13 @@ with st.container():
                     except Exception as e:
                         errors.append(f"{f.name}: {e}")
                 _list_jds.clear()  # refresh JD dropdown
-                _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
+                _list_resumes.clear()
                 for err in errors:
                     st.warning(err)
-                st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
+                st.success(
+                    f"Uploaded {len(jd_files) - len(errors)} JD(s)."
+                    + (f" Req IDs: {', '.join(uploaded_req_ids)}" if uploaded_req_ids else "")
+                )
         with up_col2:
             st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
             resume_files = st.file_uploader(
@@ -361,8 +369,8 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 if rank_clicked:
     try:
-        jd_data = fetch_blob(JD_CONTAINER, selected_jd)
-        jd_text = extract_text(selected_jd, jd_data)
+        jd_name, jd_data = fetch_jd_by_req_id(selected_jd)
+        jd_text = extract_text(jd_name, jd_data)
     except Exception as e:
         st.error(f"Failed to load job description: {e}")
         st.stop()
@@ -415,10 +423,13 @@ if rank_clicked:
         with jd_kw_col:
             st.markdown('<div class="section-title">JD Keywords (extracted by OpenAI)</div>', unsafe_allow_html=True)
         with jd_link_col:
-            try:
-                st.link_button("Open JD ↗", get_blob_url(JD_CONTAINER, selected_jd))
-            except Exception:
-                pass
+            _ext = os.path.splitext(jd_name)[1].lower()
+            _mime = (
+                "application/pdf" if _ext == ".pdf"
+                else "text/plain" if _ext == ".txt"
+                else "application/octet-stream"
+            )
+            st.download_button("Download JD", data=jd_data, file_name=jd_name, mime=_mime, key="dl_jd")
 
         try:
             kw = extract_jd_keywords_structured(jd_text)

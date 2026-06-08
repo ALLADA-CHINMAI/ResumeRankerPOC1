@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import List, Dict, Optional
 
 from ResumeRankerCore.clients import get_resume_search
-from ResumeRankerCore.storage import fetch_blob, fetch_parsed_text, JD_CONTAINER
+from ResumeRankerCore.db import fetch_jd_by_req_id
 from ResumeRankerCore.text_utils import extract_text
 
 
@@ -58,26 +58,23 @@ def search_candidates(
     ]
 
 
-def get_jd_text(jd_name: str) -> str:
+def get_jd_text(req_id: str) -> str:
     """
-    Retrieve the full text of a stored job description by filename.
+    Retrieve the full text of a stored job description by its req_id.
 
     Use this to fetch a JD from the system so you can pass its text to
     rank_candidates_for_job, compare_candidates, or analyze_skill_gaps
     without requiring the user to paste the JD manually.
 
     Args:
-        jd_name: Exact JD filename as returned by list_job_descriptions.
-                 E.g. "senior_software_engineer_jd.pdf"
+        req_id: 4-digit req ID as returned by list_job_descriptions.
+                E.g. "0001" or "0004"
 
     Returns:
         Full extracted plaintext of the job description.
 
     Raises:
-        ValueError: If jd_name is not found in blob storage.
+        ValueError: If no JD with that req_id exists.
     """
-    try:
-        raw = fetch_blob(JD_CONTAINER, jd_name)
-    except Exception as e:
-        raise ValueError(f"JD '{jd_name}' not found in storage: {e}") from e
+    jd_name, raw = fetch_jd_by_req_id(req_id)
     return extract_text(jd_name, raw)

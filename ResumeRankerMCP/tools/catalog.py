@@ -5,10 +5,10 @@ Lightweight — no LLM calls, no search scoring, just index/blob enumeration.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Dict
 
 from ResumeRankerCore.clients import get_resume_search
-from ResumeRankerCore.storage import list_blobs, JD_CONTAINER
+from ResumeRankerCore.db import list_jds as db_list_jds
 
 
 def list_candidates() -> List[str]:
@@ -26,15 +26,15 @@ def list_candidates() -> List[str]:
     return get_resume_search().list_documents()
 
 
-def list_job_descriptions() -> List[str]:
+def list_job_descriptions() -> List[Dict]:
     """
-    Return all job description filenames stored in the system.
+    Return all job descriptions stored in the system with their req IDs.
 
-    Use this to discover what JDs are available. JD filenames can be passed
-    to get_jd_text to retrieve their content for use in ranking tools.
+    Use this to discover available JDs. Pass the req_id to get_jd_text
+    to retrieve its content for use in ranking and analysis tools.
 
     Returns:
-        List of JD filenames from blob storage.
-        Example: ["senior_swe_jd.pdf", "devops_engineer_jd.txt"]
+        List of dicts ordered by req_id ascending.
+        Example: [{"req_id": "0001", "jd_name": "senior_swe_jd.pdf"}, ...]
     """
-    return list_blobs(JD_CONTAINER)
+    return db_list_jds()
