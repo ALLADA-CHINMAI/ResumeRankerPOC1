@@ -57,11 +57,20 @@ def fetch_blob(container: str, name: str) -> bytes:
     )
 
 
-def upload_blob(container: str, name: str, data: bytes):
+def upload_blob(container: str, name: str, data: bytes, metadata: dict = None):
     """Upload bytes to a blob, overwriting any existing content."""
     get_blob_service().get_blob_client(container=container, blob=name).upload_blob(
-        data, overwrite=True
+        data, overwrite=True, metadata=metadata
     )
+
+
+def find_jd_by_req_id(req_id: str):
+    """Return the JD blob name whose metadata req_id matches, or None."""
+    container_client = get_blob_service().get_container_client(JD_CONTAINER)
+    for blob in container_client.list_blobs(include=["metadata"]):
+        if blob.get("metadata") and blob["metadata"].get("req_id") == req_id:
+            return blob.name
+    return None
 
 
 # ---------------------------------------------------------------------------

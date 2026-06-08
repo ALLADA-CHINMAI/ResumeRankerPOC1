@@ -54,6 +54,7 @@ class DocumentSearchClient:
         self._emb_model = embedding_model
         self._name_field = name_field
         self._ensure_index()
+        self._add_req_id_field_if_missing()
 
     # ------------------------------------------------------------------
     # Index lifecycle
@@ -67,8 +68,8 @@ class DocumentSearchClient:
             logger.info("Index '%s' not found — creating.", self._index_name)
             self._create_index()
 
-    def _create_index(self):
-        index = SearchIndex(
+    def _build_index_definition(self) -> SearchIndex:
+        return SearchIndex(
             name=self._index_name,
             fields=[
                 SearchField(
@@ -83,6 +84,12 @@ class DocumentSearchClient:
                     searchable=True,
                     filterable=True,
                     facetable=True,   # enables efficient list_documents() via facets
+                    retrievable=True,
+                ),
+                SearchField(
+                    name="req_id",
+                    type=SearchFieldDataType.String,
+                    filterable=True,
                     retrievable=True,
                 ),
                 SearchField(
@@ -110,8 +117,21 @@ class DocumentSearchClient:
                 profiles=[VectorSearchProfile(name="hnsw-profile", algorithm_configuration_name="hnsw-config")],
             ),
         )
-        self._index_client.create_index(index)
+
+    def _create_index(self):
+        self._index_client.create_index(self._build_index_definition())
         logger.info("Created index '%s'.", self._index_name)
+
+    def _add_req_id_field_if_missing(self):
+        """Add req_id field to an existing index that predates this feature. Safe no-op if already present."""
+        try:
+            existing = self._index_client.get_index(self._index_name)
+            field_names = {f.name for f in existing.fields}
+            if "req_id" not in field_names:
+                self._index_client.create_or_update_index(self._build_index_definition())
+                logger.info("Added 'req_id' field to existing index '%s'.", self._index_name)
+        except Exception as e:
+            logger.warning("Could not update index schema for req_id: %s", e)
 
     # ------------------------------------------------------------------
     # Embedding
@@ -139,7 +159,7 @@ class DocumentSearchClient:
     # Indexing
     # ------------------------------------------------------------------
 
-    def index_document(self, doc_name: str, text: str):
+    def index_document(self, doc_name: str, text: str, req_id: str = None):
         """Chunk, embed (batched), and upload a document. Replaces any prior version."""
         self._delete_docs(doc_name)
         chunks = chunk_text(text)
@@ -156,6 +176,7 @@ class DocumentSearchClient:
             docs.append({
                 "id": doc_id,
                 self._name_field: doc_name,
+                "req_id": req_id or "",
                 "chunk_text": chunk,
                 "chunk_index": i,
                 "chunk_vector": vec,
@@ -163,6 +184,24 @@ class DocumentSearchClient:
 
         self._client.upload_documents(docs)
         logger.info("Indexed %d chunk(s) for '%s'.", len(docs), doc_name)
+
+    def find_doc_by_req_id(self, req_id: str) -> Optional[str]:
+        """Return the document name whose req_id matches, or None."""
+        if not req_id:
+            return None
+        safe = req_id.replace("'", "''")
+        try:
+            results = self._client.search(
+                search_text="*",
+                filter=f"req_id eq '{safe}'",
+                select=[self._name_field],
+                top=1,
+            )
+            for r in results:
+                return r[self._name_field]
+        except Exception as e:
+            logger.warning("find_doc_by_req_id failed: %s", e)
+        return None
 
     def _delete_docs(self, doc_name: str):
         """Remove all existing chunks for a document before re-indexing."""

@@ -11,6 +11,8 @@ openpyxl
 python-docx
 pdfplumber
 
+fastapi>=0.111.0
+
 # MCP server (requires Python 3.10+)
 fastmcp>=2.0.0
 uvicorn>=0.29.0

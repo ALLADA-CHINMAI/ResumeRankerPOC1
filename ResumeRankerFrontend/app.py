@@ -245,15 +245,29 @@ with st.container():
                 accept_multiple_files=True,
                 key="jd_uploader",
             )
+            jd_req_ids = {}
+            if jd_files:
+                st.markdown("**Requisition ID for each JD** *(optional but required for API access)*")
+                for f in jd_files:
+                    jd_req_ids[f.name] = st.text_input(
+                        f.name,
+                        key=f"jd_req_id_{f.name}",
+                        placeholder="e.g. JOB-2024-001",
+                        label_visibility="visible",
+                    )
             if st.button("Upload JDs", disabled=not jd_files, key="btn_upload_jd"):
                 errors = []
                 for f in jd_files:
                     data = f.read()
+                    req_id = jd_req_ids.get(f.name, "").strip()
                     try:
-                        upload_blob(JD_CONTAINER, f.name, data)
+                        upload_blob(
+                            JD_CONTAINER, f.name, data,
+                            metadata={"req_id": req_id} if req_id else None,
+                        )
                         text = extract_text(f.name, data)
                         if text.strip():
-                            jd_search.index_document(f.name, text)
+                            jd_search.index_document(f.name, text, req_id=req_id or None)
                         else:
                             errors.append(f"{f.name}: no text extracted")
                     except Exception as e:
