@@ -47,7 +47,15 @@ def get_jd_text(jd_name: str) -> str:
         jd_name: Exact JD filename as returned by list_job_descriptions.
     """
     try:
+        from ResumeRankerCommon.db_ops import get_jd_full_text
+        text = get_jd_full_text(jd_name)
+        if text:
+            return text
+    except Exception:
+        pass
+    # Fallback: fetch from blob and extract (pre-migration JDs)
+    try:
         raw = fetch_blob(JD_CONTAINER, jd_name)
     except Exception as e:
-        raise ValueError(f"JD '{jd_name}' not found in storage: {e}") from e
+        raise ValueError(f"JD '{jd_name}' not found: {e}") from e
     return extract_text(jd_name, raw)

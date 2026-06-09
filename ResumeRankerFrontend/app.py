@@ -17,20 +17,19 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-from ResumeRankerCommon.clients import validate_config, get_resume_search, get_jd_search
-from ResumeRankerCommon.text_utils import extract_text
+from ResumeRankerCommon.clients import validate_config, get_resume_search
 from ResumeRankerCommon.storage import (
     list_blobs,
     fetch_blob,
     upload_blob,
-    store_parsed_text,
     get_blob_url,
     RESUME_CONTAINER,
     JD_CONTAINER,
 )
-from ResumeRankerCommon.ranking import rank_resumes, extract_jd_keywords, extract_jd_keywords_structured
+from ResumeRankerCommon.ranking import rank_resumes, extract_jd_keywords_structured
 from ResumeRankerCommon.config import get_score_max
-from ResumeRankerCommon.xlsx_utils import update_candidate_metadata
+from ResumeRankerCommon.db_ops import list_jd_names, list_candidate_resume_names, get_jd_full_text
+from ResumeRankerCommon.text_utils import extract_text
 
 load_dotenv()
 
@@ -91,9 +90,8 @@ with st.spinner("Initializing Resume Ranker resources..."):
     def _init():
         validate_config()
         resume_search = get_resume_search()
-        jd_search     = get_jd_search()
-        return resume_search, jd_search
-    resume_search, jd_search = _init()
+        return resume_search,
+    resume_search, = _init()
 
 # ---------------------------------------------------------------------------
 # Cached blob listings — avoids Azure round-trip on every widget interaction
@@ -101,11 +99,23 @@ with st.spinner("Initializing Resume Ranker resources..."):
 
 @st.cache_data(ttl=30)
 def _list_jds():
+    try:
+        names = list_jd_names()
+        if names:
+            return names
+    except Exception as e:
+        logger.warning("DB list_jd_names failed, falling back to blob listing: %s", e)
     return list_blobs(JD_CONTAINER)
 
 
 @st.cache_data(ttl=30)
 def _list_resumes():
+    try:
+        names = list_candidate_resume_names()
+        if names:
+            return names
+    except Exception as e:
+        logger.warning("DB list_candidate_resume_names failed, falling back to blob listing: %s", e)
     return list_blobs(RESUME_CONTAINER)
 
 
@@ -265,18 +275,14 @@ with st.container():
                             JD_CONTAINER, f.name, data,
                             metadata={"req_id": req_id} if req_id else None,
                         )
-                        text = extract_text(f.name, data)
-                        if text.strip():
-                            jd_search.index_document(f.name, text, req_id=req_id or None)
-                        else:
-                            errors.append(f"{f.name}: no text extracted")
                     except Exception as e:
                         errors.append(f"{f.name}: {e}")
-                _list_jds.clear()  # refresh JD dropdown
-                _list_resumes.clear()  # also clear resumes cache in case JDs affect downstream logic
+                _list_jds.clear()
                 for err in errors:
                     st.warning(err)
-                st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
+                if len(jd_files) - len(errors) > 0:
+                    st.success(f"Uploaded {len(jd_files) - len(errors)} JD(s).")
+                    st.info("Processing in background — JDs will be available for ranking within ~30 seconds.")
         with up_col2:
             st.markdown('<div class="section-title">Upload New Resumes</div>', unsafe_allow_html=True)
             resume_files = st.file_uploader(
@@ -284,35 +290,20 @@ with st.container():
                 accept_multiple_files=True,
                 key="resume_uploader",
             )
-            if st.button("Upload & Index Resumes", disabled=not resume_files, key="btn_upload_res"):
-                progress = st.progress(0, text="Starting…")
+            if st.button("Upload Resumes", disabled=not resume_files, key="btn_upload_res"):
                 errors = []
-                for idx, f in enumerate(resume_files):
-                    progress.progress((idx + 0.5) / len(resume_files), text=f"Uploading {f.name}…")
+                for f in resume_files:
                     data = f.read()
                     try:
                         upload_blob(RESUME_CONTAINER, f.name, data)
-                        text = extract_text(f.name, data)
-                        if text.strip():
-                            progress.progress((idx + 0.8) / len(resume_files), text=f"Indexing {f.name}…")
-                            resume_search.index_document(f.name, text)
-                            store_parsed_text(f.name, text)
-                            try:
-                                blob_url = get_blob_url(RESUME_CONTAINER, f.name)
-                                update_candidate_metadata(f.name, text, blob_url=blob_url)
-                            except Exception as e:
-                                logger.warning("candidate_metadata update skipped for %s: %s", f.name, e)
-                        else:
-                            errors.append(f"{f.name}: no text extracted")
                     except Exception as e:
                         errors.append(f"{f.name}: {e}")
-                    progress.progress((idx + 1) / len(resume_files))
-                progress.empty()
-                _list_resumes.clear()  # refresh resume list
-                _list_jds.clear()      # also clear JD cache in case resumes affect downstream logic
+                _list_resumes.clear()
                 for err in errors:
                     st.warning(err)
-                st.success(f"Done — {len(resume_files) - len(errors)} resume(s) uploaded and indexed.")
+                if len(resume_files) - len(errors) > 0:
+                    st.success(f"Uploaded {len(resume_files) - len(errors)} resume(s).")
+                    st.info("Indexing in background — resumes will appear in the list within ~30 seconds.")
 
 st.markdown('<hr class="ph-divider">', unsafe_allow_html=True)
 
@@ -375,8 +366,10 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 if rank_clicked:
     try:
-        jd_data = fetch_blob(JD_CONTAINER, selected_jd)
-        jd_text = extract_text(selected_jd, jd_data)
+        jd_text = get_jd_full_text(selected_jd)          # DB read — fast, no blob fetch needed
+        if not jd_text:                                   # fallback for pre-migration JDs not yet in DB
+            jd_data = fetch_blob(JD_CONTAINER, selected_jd)
+            jd_text = extract_text(selected_jd, jd_data)
     except Exception as e:
         st.error(f"Failed to load job description: {e}")
         st.stop()
@@ -400,6 +393,7 @@ if rank_clicked:
             top_n=10,
             selected_resumes=filter_resumes,
             on_progress=_progress,
+            jd_name=selected_jd,                         # enables Ranking_Cache fast path
         )
         status.update(label="Ranking complete!", state="complete", expanded=False)
 
@@ -475,7 +469,7 @@ if rank_clicked:
         st.markdown('<div class="section-title">Score Breakdown</div>', unsafe_allow_html=True)
 
         for i, r in enumerate(results):
-            with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
+            with st.expander(f"#{i + 1}  {r['candidate_name']}  —  {r['total_score']:.1f} / 100"):
                 score_max = get_score_max()
                 cols = st.columns(len(score_max))
                 for col, (key, max_pts) in zip(cols, score_max.items()):

@@ -65,11 +65,22 @@ def upload_blob(container: str, name: str, data: bytes, metadata: dict = None):
 
 
 def find_jd_by_req_id(req_id: str):
-    """Return the JD blob name whose metadata req_id matches, or None."""
+    """Return {name, full_text} for a JD matching req_id, or None.
+    Reads from DB first; falls back to blob metadata scan for pre-migration JDs.
+    """
+    try:
+        from ResumeRankerCommon.db_ops import find_jd_by_req_id as db_find
+        result = db_find(req_id)
+        if result:
+            return result
+    except Exception as e:
+        logger.warning("DB find_jd_by_req_id failed, falling back to blob scan: %s", e)
+
+    # Fallback: blob metadata scan (pre-migration JDs that aren't in DB yet)
     container_client = get_blob_service().get_container_client(JD_CONTAINER)
     for blob in container_client.list_blobs(include=["metadata"]):
         if blob.get("metadata") and blob["metadata"].get("req_id") == req_id:
-            return blob.name
+            return {"name": blob.name, "full_text": None}
     return None
 
 
@@ -80,14 +91,28 @@ def find_jd_by_req_id(req_id: str):
 # ---------------------------------------------------------------------------
 
 def store_parsed_text(doc_name: str, text: str):
-    """Cache extracted text for a resume after upload so ranking can fetch it cheaply."""
+    """Cache extracted resume text. Writes to DB (primary) and blob (kept as fallback)."""
+    try:
+        from ResumeRankerCommon.db_ops import upsert_candidate_file
+        upsert_candidate_file(resume_name=doc_name, parsed_text=text)
+    except Exception as e:
+        logger.warning("DB store_parsed_text failed, writing blob only: %s", e)
+    # Keep blob write during transition so pre-Function uploads still have a fallback
     _ensure_container(PARSED_TEXT_CONTAINER)
-    # Blob names always use forward slashes (Azure convention — works on Windows too)
     upload_blob(PARSED_TEXT_CONTAINER, doc_name, text.encode("utf-8"))
 
 
 def fetch_parsed_text(doc_name: str) -> str:
-    """Fetch cached parsed text. Raises if the blob doesn't exist (caller should fall back)."""
+    """Fetch cached resume text. Reads from DB first; falls back to blob for pre-migration data."""
+    try:
+        from ResumeRankerCommon.db_ops import fetch_candidate_parsed_text
+        text = fetch_candidate_parsed_text(doc_name)
+        if text:
+            return text
+    except Exception as e:
+        logger.warning("DB fetch_parsed_text failed, falling back to blob: %s", e)
+
+    # Fallback: resumes-parsed blob (pre-migration resumes or DB miss)
     data = fetch_blob(PARSED_TEXT_CONTAINER, doc_name)
     return data.decode("utf-8")
 

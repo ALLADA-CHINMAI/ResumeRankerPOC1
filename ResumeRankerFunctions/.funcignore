@@ -1,0 +1,15 @@
+.git*
+.venv
+.venv-mcp
+__pycache__
+*.pyc
+*.pyo
+ResumeRankerFrontend
+ResumeRankerMCP
+ResumeRankerAPI
+db_migrations
+scripts
+docs
+*.md
+*.xlsx
+local.settings.json

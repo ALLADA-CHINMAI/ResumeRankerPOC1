@@ -34,7 +34,6 @@ AUTH_SCOPE             = os.getenv("AUTH_SCOPE")
 SEARCH_ENDPOINT        = os.getenv("AZURE_SEARCH_ENDPOINT")
 SEARCH_API_KEY         = os.getenv("AZURE_SEARCH_API_KEY")
 RESUME_INDEX           = os.getenv("AZURE_SEARCH_RESUME_INDEX_NAME", "resume_chunks")
-JD_INDEX               = os.getenv("AZURE_SEARCH_JD_INDEX_NAME", "jd_chunks")
 
 STORAGE_CONN_STR       = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 
@@ -55,6 +54,8 @@ def validate_config():
         missing.append("AZURE_SEARCH_API_KEY")
     if not STORAGE_CONN_STR:
         missing.append("AZURE_STORAGE_CONNECTION_STRING")
+    if not os.getenv("DB_CONNECTION_STRING"):
+        missing.append("DB_CONNECTION_STRING")
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
@@ -158,7 +159,6 @@ class RefreshingAzureOpenAI:
 _openai_singleton: Optional[RefreshingAzureOpenAI] = None
 _blob_singleton: Optional[BlobServiceClient] = None
 _resume_search_singleton = None
-_jd_search_singleton = None
 
 
 def get_openai_client() -> RefreshingAzureOpenAI:
@@ -191,17 +191,3 @@ def get_resume_search():
     return _resume_search_singleton
 
 
-def get_jd_search():
-    """Return the DocumentSearchClient for the JDs index."""
-    global _jd_search_singleton
-    if _jd_search_singleton is None:
-        from ResumeRankerCommon.search import DocumentSearchClient
-        _jd_search_singleton = DocumentSearchClient(
-            endpoint=SEARCH_ENDPOINT,
-            api_key=SEARCH_API_KEY,
-            index_name=JD_INDEX,
-            openai_client=get_openai_client(),
-            embedding_model=EMBEDDING_DEPLOYMENT,
-            name_field="jd_name",
-        )
-    return _jd_search_singleton

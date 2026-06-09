@@ -13,7 +13,7 @@ from typing import Dict, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from ResumeRankerCommon.clients import get_jd_search
+from ResumeRankerCommon.db_ops import find_jd_by_req_id, get_jd_full_text
 from ResumeRankerCommon.models import RankedCandidate
 from ResumeRankerCommon.ranking import extract_jd_keywords_structured, rank_resumes
 
@@ -46,20 +46,28 @@ class RankResponse(BaseModel):
 
 @app.post("/rankResumes", response_model=RankResponse)
 def rank(request: RankRequest):
-    jd_search = get_jd_search()
+    # Single DB query returns both name and full_text
+    jd = find_jd_by_req_id(request.req_id)
+    if not jd:
+        # Fallback: blob metadata scan for pre-migration JDs
+        from ResumeRankerCommon.storage import find_jd_by_req_id as storage_find
+        jd = storage_find(request.req_id)
+        if not jd:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No JD found for req_id '{request.req_id}'",
+            )
 
-    jd_name = jd_search.find_doc_by_req_id(request.req_id)
-    if not jd_name:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No JD found for req_id '{request.req_id}'",
-        )
+    jd_name = jd["name"]
+    jd_text = jd.get("full_text")
 
-    jd_text = jd_search.get_document_text(jd_name)
-    if not jd_text.strip():
+    # full_text may be None for pre-migration JDs found via blob fallback
+    if not jd_text:
+        jd_text = get_jd_full_text(jd_name)
+    if not jd_text or not jd_text.strip():
         raise HTTPException(
             status_code=500,
-            detail=f"JD '{jd_name}' is indexed but has no retrievable text.",
+            detail=f"JD '{jd_name}' has no retrievable text.",
         )
 
     try:
@@ -67,7 +75,7 @@ def rank(request: RankRequest):
     except Exception:
         jd_keywords = {}
 
-    raw_results = rank_resumes(jd_text, top_n=request.top_k)
+    raw_results = rank_resumes(jd_text, top_n=request.top_k, jd_name=jd_name)
 
     results = [
         CandidateResult(rank=i + 1, **r)

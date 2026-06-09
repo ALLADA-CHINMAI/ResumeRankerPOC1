@@ -158,6 +158,7 @@ def rank_resumes(
     selected_resumes: Optional[List[str]] = None,
     search_top: int = 25,
     on_progress: Optional[callable] = None,
+    jd_name: Optional[str] = None,
 ) -> List[RankedCandidate]:
     """
     Rank resumes against a job description.
@@ -177,6 +178,7 @@ def rank_resumes(
         on_progress:      Optional callback(message: str) for real-time UI progress updates.
     """
     _p = on_progress or (lambda msg: None)  # no-op if no callback provided
+
     resume_search = get_resume_search()
 
     # Stage 1 — keyword extraction + hybrid search
