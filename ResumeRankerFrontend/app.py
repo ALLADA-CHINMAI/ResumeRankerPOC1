@@ -475,7 +475,7 @@ if rank_clicked:
         st.markdown('<div class="section-title">Score Breakdown</div>', unsafe_allow_html=True)
 
         for i, r in enumerate(results):
-            with st.expander(f"#{i + 1}  {r['name']}  —  {r['total_score']:.1f} / 100"):
+            with st.expander(f"#{i + 1}  {r['candidate_name']}  —  {r['total_score']:.1f} / 100"):
                 score_max = get_score_max()
                 cols = st.columns(len(score_max))
                 for col, (key, max_pts) in zip(cols, score_max.items()):
