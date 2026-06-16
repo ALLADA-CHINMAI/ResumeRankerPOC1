@@ -1,11 +1,8 @@
 """
 Azure Blob Storage helpers.
-Also manages the 'resumes-parsed' container that caches extracted resume text
-so ranking doesn't need to reassemble it from search index chunks.
 """
 
 import os
-import logging
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import List
@@ -15,27 +12,11 @@ from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 from ResumeRankerMCP.common.clients import get_blob_service
 
 load_dotenv()
-logger = logging.getLogger(__name__)
 
 # Blob container names from environment
 RESUME_CONTAINER      = os.getenv("RESUME_CONTAINER_NAME", "resumes")
 JD_CONTAINER          = os.getenv("JD_CONTAINER_NAME", "jds")
 PARSED_TEXT_CONTAINER = "resumes-parsed"   # auto-created; stores plain-text cache for ranking
-
-# Track which containers we've already ensured exist in this process
-_ensured_containers: set = set()
-
-
-def _ensure_container(name: str):
-    """Create blob container if it doesn't exist. Cached per process to avoid repeated API calls."""
-    if name in _ensured_containers:
-        return
-    try:
-        get_blob_service().create_container(name)
-        logger.info("Created blob container '%s'.", name)
-    except Exception:
-        pass  # ResourceExistsError is expected and safe to ignore
-    _ensured_containers.add(name)
 
 
 # ---------------------------------------------------------------------------
@@ -55,35 +36,6 @@ def fetch_blob(container: str, name: str) -> bytes:
         .download_blob()
         .readall()
     )
-
-
-def upload_blob(container: str, name: str, data: bytes, metadata: dict = None):
-    """Upload bytes to a blob, overwriting any existing content."""
-    get_blob_service().get_blob_client(container=container, blob=name).upload_blob(
-        data, overwrite=True, metadata=metadata
-    )
-
-
-def find_jd_by_req_id(req_id: str):
-    """Return the JD blob name whose metadata req_id matches, or None."""
-    container_client = get_blob_service().get_container_client(JD_CONTAINER)
-    for blob in container_client.list_blobs(include=["metadata"]):
-        if blob.get("metadata") and blob["metadata"].get("req_id") == req_id:
-            return blob.name
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Parsed-text cache
-# Stored in 'resumes-parsed' container using the original filename as the blob key.
-# Avoids re-assembling resume text from search index chunks during every ranking run.
-# ---------------------------------------------------------------------------
-
-def store_parsed_text(doc_name: str, text: str):
-    """Cache extracted text for a resume after upload so ranking can fetch it cheaply."""
-    _ensure_container(PARSED_TEXT_CONTAINER)
-    # Blob names always use forward slashes (Azure convention — works on Windows too)
-    upload_blob(PARSED_TEXT_CONTAINER, doc_name, text.encode("utf-8"))
 
 
 def fetch_parsed_text(doc_name: str) -> str:

@@ -1,10 +1,5 @@
-"""
-Azure Cognitive Search client for chunked document indexing and hybrid retrieval.
-Works for both resumes and JDs — parameterized via name_field.
-Index is auto-created on first use; no manual portal setup needed.
-"""
+"""Azure Cognitive Search client for resume retrieval and hybrid search."""
 
-import hashlib
 import logging
 from typing import List, Dict, Optional
 
@@ -21,20 +16,16 @@ from azure.search.documents.indexes.models import (
 )
 from azure.core.credentials import AzureKeyCredential
 
-from ResumeRankerMCP.common.text_utils import chunk_text
-
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIMS = 1536   # text-embedding-ada-002
-_EMBED_BATCH_SIZE = 100  # safe batch limit for Azure OpenAI embeddings API
 
 
 class DocumentSearchClient:
     """
-    Wraps Azure Cognitive Search for hybrid (BM25 + vector) indexing and retrieval.
+    Wraps Azure Cognitive Search for hybrid (BM25 + vector) retrieval.
 
     Pass name_field="resume_name" for resumes, name_field="jd_name" for JDs.
-    Both use the same schema — only the document-name field differs.
     """
 
     def __init__(
@@ -137,85 +128,10 @@ class DocumentSearchClient:
     # Embedding
     # ------------------------------------------------------------------
 
-    def _embed_batch(self, texts: List[str]) -> List[List[float]]:
-        """
-        Embed multiple texts in batches — single API call per batch instead of N calls.
-        Dramatically faster during indexing (e.g. 15 chunks → 1 call instead of 15).
-        """
-        all_embeddings: List[List[float]] = []
-        for i in range(0, len(texts), _EMBED_BATCH_SIZE):
-            batch = texts[i: i + _EMBED_BATCH_SIZE]
-            response = self._openai.embeddings.create(model=self._emb_model, input=batch)
-            # Sort by index to guarantee order matches input order
-            sorted_items = sorted(response.data, key=lambda x: x.index)
-            all_embeddings.extend(item.embedding for item in sorted_items)
-        return all_embeddings
-
     def embed(self, text: str) -> List[float]:
         """Embed a single text string (used for search queries)."""
-        return self._embed_batch([text])[0]
-
-    # ------------------------------------------------------------------
-    # Indexing
-    # ------------------------------------------------------------------
-
-    def index_document(self, doc_name: str, text: str, req_id: str = None):
-        """Chunk, embed (batched), and upload a document. Replaces any prior version."""
-        self._delete_docs(doc_name)
-        chunks = chunk_text(text)
-        if not chunks:
-            logger.warning("No text chunks extracted for '%s' — skipping index.", doc_name)
-            return
-
-        # All chunks embedded in as few API calls as possible
-        vectors = self._embed_batch(chunks)
-
-        docs = []
-        for i, (chunk, vec) in enumerate(zip(chunks, vectors)):
-            doc_id = hashlib.md5(f"{doc_name}::{i}".encode()).hexdigest()
-            docs.append({
-                "id": doc_id,
-                self._name_field: doc_name,
-                "req_id": req_id or "",
-                "chunk_text": chunk,
-                "chunk_index": i,
-                "chunk_vector": vec,
-            })
-
-        self._client.upload_documents(docs)
-        logger.info("Indexed %d chunk(s) for '%s'.", len(docs), doc_name)
-
-    def find_doc_by_req_id(self, req_id: str) -> Optional[str]:
-        """Return the document name whose req_id matches, or None."""
-        if not req_id:
-            return None
-        safe = req_id.replace("'", "''")
-        try:
-            results = self._client.search(
-                search_text="*",
-                filter=f"req_id eq '{safe}'",
-                select=[self._name_field],
-                top=1,
-            )
-            for r in results:
-                return r[self._name_field]
-        except Exception as e:
-            logger.warning("find_doc_by_req_id failed: %s", e)
-        return None
-
-    def _delete_docs(self, doc_name: str):
-        """Remove all existing chunks for a document before re-indexing."""
-        safe = doc_name.replace("'", "''")
-        results = self._client.search(
-            search_text="*",
-            filter=f"{self._name_field} eq '{safe}'",
-            select=["id"],
-            top=1000,
-        )
-        ids = [{"id": r["id"]} for r in results]
-        if ids:
-            self._client.delete_documents(ids)
-            logger.info("Deleted %d old chunk(s) for '%s'.", len(ids), doc_name)
+        response = self._openai.embeddings.create(model=self._emb_model, input=[text])
+        return response.data[0].embedding
 
     # ------------------------------------------------------------------
     # Retrieval

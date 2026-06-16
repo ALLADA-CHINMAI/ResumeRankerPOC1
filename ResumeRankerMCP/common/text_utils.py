@@ -1,13 +1,10 @@
 """Text extraction and chunking utilities. No external state — pure functions."""
 
 import os
-import logging
 from functools import lru_cache
 from typing import List
 
 import tiktoken
-
-logger = logging.getLogger(__name__)
 
 CHUNK_TOKENS = 400          # ~300 words — fits one full resume section
 CHUNK_OVERLAP_TOKENS = 60   # ~45 words carried into the next chunk for context continuity

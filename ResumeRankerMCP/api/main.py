@@ -81,17 +81,13 @@ def _find_jd_blob_by_req_id(req_id: str) -> str:
     if not req_id:
         return ""
     container_client = get_blob_service().get_container_client(JD_CONTAINER)
-    matches: list[str] = []
-    for blob in container_client.list_blobs(name_starts_with=req_id):
-        name = getattr(blob, "name", "") or ""
-        stem = os.path.splitext(os.path.basename(name))[0]
-        if stem == req_id:
-            matches.append(name)
-
-    if matches:
-        matches.sort(key=lambda x: (len(x), x.lower()))
-        return matches[0]
-    return ""
+    matches = [
+        name
+        for blob in container_client.list_blobs(name_starts_with=req_id)
+        for name in [getattr(blob, "name", "") or ""]
+        if os.path.splitext(os.path.basename(name))[0] == req_id
+    ]
+    return min(matches, key=lambda x: (len(x), x.lower())) if matches else ""
 
 
 @app.post("/rankResumes", response_model=RankResponse)

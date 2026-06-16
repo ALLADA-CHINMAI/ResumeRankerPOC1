@@ -150,18 +150,12 @@ def _req_id_from_blob_name(blob_name: str) -> str:
     return os.path.splitext(base)[0].strip()
 
 
-def _req_id_from_blob(blob, blob_name: str) -> str:
-    # Req ID is derived strictly from JD filename: <req_id>.<ext>
-    # Example: 1001.pdf -> req_id=1001
-    return _req_id_from_blob_name(blob_name)
-
-
 def jd_blob_trigger(blob) -> None:
     """Process a newly uploaded JD blob and persist extracted keywords."""
     name = getattr(blob, "name", "<unknown>")
     size = getattr(blob, "length", None)
     etag = str(getattr(blob, "etag", ""))
-    req_id = _req_id_from_blob(blob, name)
+    req_id = _req_id_from_blob_name(name)
     logger.info("jd_blob_trigger received blob name=%s req_id=%s size=%s", name, req_id, size)
 
     if not req_id:
