@@ -10,9 +10,9 @@ from __future__ import annotations
 import json
 from typing import Dict
 
-from ResumeRankerCommon.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCommon.models import CandidateProfile, SkillGapAnalysis
-from ResumeRankerCommon.storage import fetch_parsed_text
+from ResumeRankerMCP.common.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerMCP.common.models import CandidateProfile, SkillGapAnalysis
+from ResumeRankerMCP.common.storage import fetch_parsed_text
 
 _PROFILE_SYSTEM = """
 Extract a structured candidate profile from the resume provided. Return ONLY valid JSON with exactly these fields:

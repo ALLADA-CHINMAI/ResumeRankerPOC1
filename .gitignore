@@ -4,3 +4,4 @@
 __pycache__/
 *.pyc
 *.pyo
+ResumeRankerFunctions/local.settings.json

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ResumeRankerCommon.models import RankedCandidate
-from ResumeRankerCommon.ranking import rank_resumes
-from ResumeRankerCommon.clients import get_resume_search
+from ResumeRankerMCP.common.models import RankedCandidate
+from ResumeRankerMCP.common.ranking import rank_resumes
+from ResumeRankerMCP.common.clients import get_resume_search
 
 
 def rank_candidates_for_job(

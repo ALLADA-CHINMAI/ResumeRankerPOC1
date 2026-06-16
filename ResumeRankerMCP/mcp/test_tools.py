@@ -7,17 +7,17 @@ with Claude Desktop or GitHub Copilot.
 
 Usage (from ResumeRankerPOC1/):
     # Mac/Linux:
-    python -m ResumeRankerMCP.test_tools
+    python -m ResumeRankerMCP.mcp.test_tools
 
     # Windows PowerShell:
-    python -m ResumeRankerMCP.test_tools
+    python -m ResumeRankerMCP.mcp.test_tools
 
     # Run only specific test:
-    python -m ResumeRankerMCP.test_tools --test catalog
-    python -m ResumeRankerMCP.test_tools --test search
-    python -m ResumeRankerMCP.test_tools --test rank
-    python -m ResumeRankerMCP.test_tools --test profile
-    python -m ResumeRankerMCP.test_tools --test gaps
+    python -m ResumeRankerMCP.mcp.test_tools --test catalog
+    python -m ResumeRankerMCP.mcp.test_tools --test search
+    python -m ResumeRankerMCP.mcp.test_tools --test rank
+    python -m ResumeRankerMCP.mcp.test_tools --test profile
+    python -m ResumeRankerMCP.mcp.test_tools --test gaps
 
 Requires: .env file at project root with Azure credentials.
 """
@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from ResumeRankerCommon.clients import validate_config
+from ResumeRankerMCP.common.clients import validate_config
 
 SAMPLE_JD = """
 We are looking for a Senior Software Engineer with 5+ years of professional
@@ -52,7 +52,7 @@ def _header(title: str):
 
 
 def test_catalog():
-    from ResumeRankerMCP.tools.catalog import list_candidates, list_job_descriptions
+    from ResumeRankerMCP.mcp.tools.catalog import list_candidates, list_job_descriptions
 
     _header("TEST: list_candidates")
     candidates = list_candidates()
@@ -71,7 +71,7 @@ def test_catalog():
 
 
 def test_search(candidates: list[str]):
-    from ResumeRankerMCP.tools.search import search_candidates
+    from ResumeRankerMCP.mcp.tools.search import search_candidates
 
     _header("TEST: search_candidates")
     query = "software engineer Python cloud experience"
@@ -94,7 +94,7 @@ def test_search(candidates: list[str]):
 
 
 def test_ranking(candidates: list[str]):
-    from ResumeRankerMCP.tools.ranking import rank_candidates_for_job, compare_candidates
+    from ResumeRankerMCP.mcp.tools.ranking import rank_candidates_for_job, compare_candidates
 
     _header("TEST: rank_candidates_for_job")
     print(f"JD: {SAMPLE_JD.strip()[:100]}...")
@@ -122,7 +122,7 @@ def test_profile(candidates: list[str]):
         print("No candidates available — skipping profile test.")
         return
 
-    from ResumeRankerMCP.tools.profile import get_candidate_profile
+    from ResumeRankerMCP.mcp.tools.profile import get_candidate_profile
 
     _header("TEST: get_candidate_profile")
     name = candidates[0]
@@ -144,7 +144,7 @@ def test_gaps(candidates: list[str]):
         print("No candidates available — skipping gap analysis test.")
         return
 
-    from ResumeRankerMCP.tools.profile import analyze_skill_gaps
+    from ResumeRankerMCP.mcp.tools.profile import analyze_skill_gaps
 
     _header("TEST: analyze_skill_gaps")
     name = candidates[0]
@@ -188,25 +188,25 @@ def main():
 
         if args.test in ("all", "search"):
             if not candidates and args.test == "search":
-                from ResumeRankerMCP.tools.catalog import list_candidates
+                from ResumeRankerMCP.mcp.tools.catalog import list_candidates
                 candidates = list_candidates()
             test_search(candidates or [])
 
         if args.test in ("all", "rank"):
             if not candidates and args.test == "rank":
-                from ResumeRankerMCP.tools.catalog import list_candidates
+                from ResumeRankerMCP.mcp.tools.catalog import list_candidates
                 candidates = list_candidates()
             test_ranking(candidates or [])
 
         if args.test in ("all", "profile"):
             if not candidates and args.test == "profile":
-                from ResumeRankerMCP.tools.catalog import list_candidates
+                from ResumeRankerMCP.mcp.tools.catalog import list_candidates
                 candidates = list_candidates()
             test_profile(candidates or [])
 
         if args.test in ("all", "gaps"):
             if not candidates and args.test == "gaps":
-                from ResumeRankerMCP.tools.catalog import list_candidates
+                from ResumeRankerMCP.mcp.tools.catalog import list_candidates
                 candidates = list_candidates()
             test_gaps(candidates or [])
 

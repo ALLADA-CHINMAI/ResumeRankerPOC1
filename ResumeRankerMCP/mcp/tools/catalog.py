@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import List
 
-from ResumeRankerCommon.clients import get_resume_search
-from ResumeRankerCommon.storage import list_blobs, JD_CONTAINER
+from ResumeRankerMCP.common.clients import get_resume_search
+from ResumeRankerMCP.common.storage import list_blobs, JD_CONTAINER
 
 
 def list_candidates() -> List[str]:

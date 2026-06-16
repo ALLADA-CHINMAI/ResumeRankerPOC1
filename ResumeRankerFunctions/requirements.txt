@@ -1,0 +1,10 @@
+azure-functions
+azure-storage-blob
+azure-search-documents>=11.4.0
+azure-core
+azure-identity
+openai
+python-dotenv
+python-docx
+pdfplumber
+tiktoken

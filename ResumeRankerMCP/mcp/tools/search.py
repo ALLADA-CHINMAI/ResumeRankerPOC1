@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import List, Dict, Optional
 
-from ResumeRankerCommon.clients import get_resume_search
-from ResumeRankerCommon.storage import fetch_blob, fetch_parsed_text, JD_CONTAINER
-from ResumeRankerCommon.text_utils import extract_text
+from ResumeRankerMCP.common.clients import get_resume_search
+from ResumeRankerMCP.common.storage import fetch_blob, fetch_parsed_text, JD_CONTAINER
+from ResumeRankerMCP.common.text_utils import extract_text
 
 
 def search_candidates(

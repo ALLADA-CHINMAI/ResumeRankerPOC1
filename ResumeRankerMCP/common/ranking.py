@@ -13,10 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import List, Optional
 
-from ResumeRankerCommon.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerCommon.config import get_score_system, get_score_max
-from ResumeRankerCommon.models import RankedCandidate
-from ResumeRankerCommon.storage import fetch_parsed_text
+from ResumeRankerMCP.common.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from ResumeRankerMCP.common.config import get_score_system, get_score_max
+from ResumeRankerMCP.common.models import RankedCandidate
+from ResumeRankerMCP.common.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _get_score_max_cached() -> dict:
 
 
 def _scores_valid(result: dict) -> bool:
-    """Ensure every category is within its cap and the sum matches totalScore."""
+    """Ensure every category is within its cap."""
     score_max = _get_score_max_cached()
     scores = result.get("scores", {})
     for key, cap in score_max.items():
@@ -45,12 +45,14 @@ def _scores_valid(result: dict) -> bool:
         if val is None or not (0 <= float(val) <= cap):
             logger.warning("Invalid score for '%s': %s (max %s)", key, val, cap)
             return False
-    computed = sum(float(scores[k]) for k in score_max)
-    total = float(result.get("totalScore", -1))
-    if abs(total - computed) > 1:
-        logger.warning("totalScore %s does not match category sum %s", total, computed)
-        return False
     return True
+
+
+def _compute_total_score(result: dict) -> float:
+    """Compute total score from the validated category scores."""
+    score_max = _get_score_max_cached()
+    scores = result.get("scores", {})
+    return sum(float(scores[k]) for k in score_max)
 
 
 # ---------------------------------------------------------------------------
@@ -83,38 +85,6 @@ def extract_jd_keywords(jd_text: str) -> str:
     return resp.choices[0].message.content
 
 
-@lru_cache(maxsize=64)
-def extract_jd_keywords_structured(jd_text: str) -> dict:
-    """
-    Extract category-wise keywords from a JD as a structured dict.
-    Cached separately from extract_jd_keywords so both can co-exist.
-    """
-    resp = get_openai_client().chat.completions.create(
-        model=OPENAI_DEPLOYMENT,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Extract key requirements from a job description and return JSON with exactly these keys:\n"
-                    '{"jobTitle": "string", '
-                    '"technicalSkills": ["short item", ...], '
-                    '"experience": "string", '
-                    '"certifications": ["short item", ...], '
-                    '"education": "string", '
-                    '"location": "string", '
-                    '"domain": "string"}\n'
-                    "Keep each list item short (1–4 words). Omit keys with no relevant information."
-                ),
-            },
-            {"role": "user", "content": jd_text},
-        ],
-        max_tokens=600,
-        temperature=0,
-        response_format={"type": "json_object"},
-    )
-    return json.loads(resp.choices[0].message.content)
-
-
 def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> Optional[dict]:
     """Score a single resume against a JD. Returns None if content is not a valid resume."""
     score_system = get_score_system()
@@ -137,10 +107,10 @@ def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> Optional[d
                 response_format={"type": "json_object"},
             )
             result = json.loads(resp.choices[0].message.content)
-            total = float(result.get("totalScore", -1))
-            if total == -2:
+            model_total = float(result.get("totalScore", -1))
+            if model_total == -2:
                 return None  # content is not a resume
-            if 0 <= total <= 100 and _scores_valid(result):
+            if _scores_valid(result):
                 return result
             logger.warning("Score attempt %d returned invalid result, retrying.", attempt + 1)
         except Exception as e:
@@ -157,6 +127,7 @@ def rank_resumes(
     top_n: int = 10,
     selected_resumes: Optional[List[str]] = None,
     search_top: int = 25,
+    search_query_text: Optional[str] = None,
     on_progress: Optional[callable] = None,
 ) -> List[RankedCandidate]:
     """
@@ -174,15 +145,21 @@ def rank_resumes(
         top_n:            Number of results to return (default 10).
         selected_resumes: If provided, only rank these resumes (multiselect support).
         search_top:       How many chunks to retrieve in Stage 1. Increase for larger corpora.
+        search_query_text: Precomputed keyword/query text for Stage 1 hybrid search.
         on_progress:      Optional callback(message: str) for real-time UI progress updates.
     """
     _p = on_progress or (lambda msg: None)  # no-op if no callback provided
     resume_search = get_resume_search()
 
     # Stage 1 — keyword extraction + hybrid search
-    _p("Extracting JD keywords…")
-    logger.info("Extracting JD keywords (cached if seen before)...")
-    keywords = extract_jd_keywords(jd_text)
+    if search_query_text and search_query_text.strip():
+        keywords = search_query_text.strip()
+        _p("Using precomputed JD keywords…")
+        logger.info("Using precomputed JD keyword text for hybrid search.")
+    else:
+        _p("Extracting JD keywords…")
+        logger.info("Extracting JD keywords (cached if seen before)...")
+        keywords = extract_jd_keywords(jd_text)
 
     _p(f"Searching indexed resumes (top {search_top} chunks)…")
     logger.info("Hybrid search (top=%d, filter=%s)...", search_top, bool(selected_resumes))
@@ -225,9 +202,10 @@ def rank_resumes(
         result = score_resume(jd_text, resume_text)
         if result is None:
             return None
+        total_score = _compute_total_score(result)
         return {
             "candidate_name": name,
-            "total_score": result["totalScore"],
+            "total_score": total_score,
             "scores": result.get("scores", {}),
             "reasons": result.get("scoringReasons", {}),
         }

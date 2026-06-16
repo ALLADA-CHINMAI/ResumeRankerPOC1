@@ -6,10 +6,10 @@ custom agents). Resumes and JDs are ingested via the Streamlit UI; this server
 is query-only.
 
 Transport modes:
-  stdio:  python -m ResumeRankerMCP.main --transport stdio
+  stdio:  python -m ResumeRankerMCP.mcp.main --transport stdio
           Used by Claude Desktop and GitHub Copilot (VSCode Agent mode).
 
-  http:   python -m ResumeRankerMCP.main --transport http --port 8000
+  http:   python -m ResumeRankerMCP.mcp.main --transport http --port 8000
           Used for cloud/enterprise HTTP deployments. Clients connect to
           http://host:port/sse for SSE stream and /messages for requests.
 
@@ -23,14 +23,14 @@ import os
 import argparse
 import logging
 
-# Project root on sys.path so ResumeRankerCommon is importable from any cwd.
-# Must come before any ResumeRankerCommon imports.
+# Project root on sys.path so ResumeRankerMCP is importable from any cwd.
+# Must come before any ResumeRankerMCP imports.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Trigger tiktoken tokenizer download BEFORE stdio protocol loop opens.
 # tiktoken prints to stdout on first use, which corrupts the MCP stdio stream.
 try:
-    from ResumeRankerCommon.text_utils import chunk_text as _warmup
+    from ResumeRankerMCP.common.text_utils import chunk_text as _warmup
     _warmup("")
 except Exception:
     pass
@@ -38,13 +38,13 @@ except Exception:
 from fastmcp import FastMCP
 from dotenv import load_dotenv
 
-from ResumeRankerCommon.clients import validate_config
-from ResumeRankerMCP.server_config import configure_logging
+from ResumeRankerMCP.common.clients import validate_config
+from ResumeRankerMCP.mcp.server_config import configure_logging
 
-from ResumeRankerMCP.tools.catalog import list_candidates, list_job_descriptions
-from ResumeRankerMCP.tools.search import search_candidates, get_jd_text
-from ResumeRankerMCP.tools.ranking import rank_candidates_for_job, compare_candidates
-from ResumeRankerMCP.tools.profile import get_candidate_profile, analyze_skill_gaps
+from ResumeRankerMCP.mcp.tools.catalog import list_candidates, list_job_descriptions
+from ResumeRankerMCP.mcp.tools.search import search_candidates, get_jd_text
+from ResumeRankerMCP.mcp.tools.ranking import rank_candidates_for_job, compare_candidates
+from ResumeRankerMCP.mcp.tools.profile import get_candidate_profile, analyze_skill_gaps
 
 load_dotenv()
 configure_logging()
