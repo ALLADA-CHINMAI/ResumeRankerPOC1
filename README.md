@@ -125,7 +125,7 @@ All Azure services are configured via environment variables in `local.settings.j
 - `OPENAI_ENDPOINT` — Azure OpenAI endpoint
 - `OPENAI_API_KEY` — Azure OpenAI API key
 - `OPENAI_API_VERSION` — API version (e.g., `2025-01-01-preview`)
-- `OPENAI_DEPLOYMENT_NAME` — Deployment name (e.g., `gpt-4o`)
+- `OPENAI_DEPLOYMENT_NAME` — Deployment name (e.g., `LnD-gpt-4o`)
 
 ## Development
 

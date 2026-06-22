@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 OPENAI_ENDPOINT        = os.getenv("OPENAI_ENDPOINT")
-OPENAI_DEPLOYMENT      = os.getenv("OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+OPENAI_DEPLOYMENT      = os.getenv("OPENAI_DEPLOYMENT_NAME", "LnD-gpt-4o")
 OPENAI_API_KEY         = os.getenv("OPENAI_API_KEY")
-EMBEDDING_DEPLOYMENT   = os.getenv("EMBEDDINGS_OPENAI_DEPLOYMENT_NAME", "text-embedding-ada-002")
+EMBEDDING_DEPLOYMENT   = os.getenv("EMBEDDINGS_OPENAI_DEPLOYMENT_NAME", "text-embedding-3-small")
 OPENAI_API_VERSION     = os.getenv("OPENAI_API_VERSION", "2025-01-01-preview")
 
 AUTH_TENANT_ID         = os.getenv("AUTH_TENANT_ID")

@@ -18,7 +18,7 @@ from azure.core.credentials import AzureKeyCredential
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIMS = 1536   # text-embedding-ada-002
+EMBEDDING_DIMS = 1536   # text-embedding-3-small
 
 
 class DocumentSearchClient:
