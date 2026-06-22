@@ -38,16 +38,6 @@ Do not include markdown, code fences, or any text outside the JSON object.
 """
 
 
-def _warmup_tokenizer() -> None:
-    # Prevent stdio protocol corruption from first-run tokenizer stdout noise.
-    try:
-        from ResumeRankerMCP.common.text_utils import chunk_text as _warmup
-
-        _warmup("")
-    except Exception:
-        pass
-
-
 def _load_jd_payload(req_id: str) -> dict:
     if not req_id:
         return {}
@@ -181,7 +171,6 @@ def main() -> None:
 
     load_dotenv()
     configure_logging()
-    _warmup_tokenizer()
 
     try:
         validate_config()

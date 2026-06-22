@@ -74,7 +74,7 @@ class DocumentSearchClient:
                     type=SearchFieldDataType.String,
                     searchable=True,
                     filterable=True,
-                    facetable=True,   # enables efficient list_documents() via facets
+                    facetable=True,
                     retrievable=True,
                 ),
                 SearchField(
@@ -148,38 +148,6 @@ class DocumentSearchClient:
         )
         chunks = sorted(results, key=lambda r: r["chunk_index"])
         return "\n\n".join(r["chunk_text"] for r in chunks)
-
-    def list_documents(self) -> List[str]:
-        """
-        Return distinct document names from the index.
-        Uses facets (fast, index-side) with a client-side dedup fallback for older indexes.
-        """
-        try:
-            results = self._client.search(
-                search_text="*",
-                facets=[f"{self._name_field},count:0"],
-                top=0,
-            )
-            facets = results.get_facets()
-            if facets and self._name_field in facets:
-                return [f["value"] for f in facets[self._name_field]]
-        except Exception:
-            pass  # fall through to dedup approach
-
-        # Fallback: fetch up to 1000 docs and deduplicate client-side
-        results = self._client.search(
-            search_text="*",
-            select=[self._name_field],
-            top=1000,
-        )
-        seen: set = set()
-        names: List[str] = []
-        for r in results:
-            name = r[self._name_field]
-            if name not in seen:
-                seen.add(name)
-                names.append(name)
-        return names
 
     def hybrid_search(
         self,

@@ -212,7 +212,7 @@ if submitted:
                 st.markdown(
                     f"""
                     <div class=\"summary-card\">
-                      <div class=\"summary-label\">{escape('JD Name' if has_jd_details else 'Resolved Query Text')}</div>
+                      <div class=\"summary-label\">{escape('JD Name' if has_jd_details else 'Search Query Text')}</div>
                       <div class=\"summary-value\">{escape((jd_name if has_jd_details else query_text) or 'N/A')}</div>
                     </div>
                     """,

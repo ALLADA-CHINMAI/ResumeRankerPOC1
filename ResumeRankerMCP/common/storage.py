@@ -5,7 +5,6 @@ Azure Blob Storage helpers.
 import os
 import urllib.parse
 from datetime import datetime, timezone, timedelta
-from typing import List
 
 from dotenv import load_dotenv
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
@@ -19,28 +18,14 @@ JD_CONTAINER          = os.getenv("JD_CONTAINER_NAME", "jds")
 PARSED_TEXT_CONTAINER = "resumes-parsed"   # auto-created; stores plain-text cache for ranking
 
 
-# ---------------------------------------------------------------------------
-# Core blob helpers
-# ---------------------------------------------------------------------------
-
-def list_blobs(container: str) -> List[str]:
-    """List all blob names in a container. Returns empty list if container is empty."""
-    return [b.name for b in get_blob_service().get_container_client(container).list_blobs()]
-
-
-def fetch_blob(container: str, name: str) -> bytes:
-    """Download and return blob contents as bytes."""
-    return (
+def fetch_parsed_text(doc_name: str) -> str:
+    """Fetch cached parsed text. Raises if the blob doesn't exist (caller should fall back)."""
+    data = (
         get_blob_service()
-        .get_blob_client(container=container, blob=name)
+        .get_blob_client(container=PARSED_TEXT_CONTAINER, blob=doc_name)
         .download_blob()
         .readall()
     )
-
-
-def fetch_parsed_text(doc_name: str) -> str:
-    """Fetch cached parsed text. Raises if the blob doesn't exist (caller should fall back)."""
-    data = fetch_blob(PARSED_TEXT_CONTAINER, doc_name)
     return data.decode("utf-8")
 
 

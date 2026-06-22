@@ -3,8 +3,8 @@ Resume ranking pipeline — pure business logic, zero Streamlit imports.
 Safe to call from the Streamlit UI, a CLI, or a future MCP server.
 
 Two-stage approach for scale:
-  Stage 1 (free):  hybrid search → aggregate scores per resume → keep top 25
-  Stage 2 (paid):  parallel GPT-4o scoring of top 25 only (capped regardless of corpus size)
+    Stage 1 (free):  hybrid search → aggregate scores per resume
+    Stage 2 (paid):  batched GPT-4o scoring (5 resumes per call, capped regardless of corpus size)
 """
 
 import json
@@ -19,6 +19,7 @@ from ResumeRankerMCP.common.models import RankedCandidate
 from ResumeRankerMCP.common.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
+BATCH_SCORE_SIZE = 5
 
 # ---------------------------------------------------------------------------
 # Scoring configuration (loaded from scoring_config.json)
@@ -85,37 +86,101 @@ def extract_jd_keywords(jd_text: str) -> str:
     return resp.choices[0].message.content
 
 
-def score_resume(jd_text: str, resume_text: str, retries: int = 3) -> Optional[dict]:
-    """Score a single resume against a JD. Returns None if content is not a valid resume."""
+def score_resumes_batch(
+    jd_text: str,
+    resumes: List[dict],
+    retries: int = 3,
+) -> List[dict]:
+    """Score multiple resumes in one GPT call. Expects up to BATCH_SCORE_SIZE resumes."""
+    if not resumes:
+        return []
+
     score_system = get_score_system()
+    payload = [
+        {
+            "candidate_name": r["candidate_name"],
+            "resume_text": r["resume_text"][:15000],
+        }
+        for r in resumes
+    ]
+
+    system_prompt = (
+        f"{score_system}\n\n"
+        "You will receive multiple resumes in one request. "
+        "Return ONLY valid JSON with this exact shape:\n"
+        "{\n"
+        '  "results": [\n'
+        "    {\n"
+        '      "candidate_name": "string",\n'
+        '      "totalScore": number,\n'
+        '      "scores": {...},\n'
+        '      "scoringReasons": {...}\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "Include exactly one result per input resume. Use the same candidate_name values as input."
+    )
+
     for attempt in range(retries):
         try:
             resp = get_openai_client().chat.completions.create(
                 model=OPENAI_DEPLOYMENT,
                 messages=[
-                    {"role": "system", "content": score_system},
+                    {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
                         "content": (
                             f"Job Description:\n{jd_text}\n\n"
-                            f"Resume:\n{resume_text[:15000]}"
+                            f"Resumes JSON:\n{json.dumps(payload, ensure_ascii=True)}"
                         ),
                     },
                 ],
-                max_tokens=1000,
+                max_tokens=3000,
                 temperature=0,
                 response_format={"type": "json_object"},
             )
-            result = json.loads(resp.choices[0].message.content)
-            model_total = float(result.get("totalScore", -1))
-            if model_total == -2:
-                return None  # content is not a resume
-            if _scores_valid(result):
-                return result
-            logger.warning("Score attempt %d returned invalid result, retrying.", attempt + 1)
+
+            parsed = json.loads(resp.choices[0].message.content)
+            raw_results = parsed.get("results", []) if isinstance(parsed, dict) else []
+            if not isinstance(raw_results, list):
+                logger.warning("Batch score response has non-list 'results'.")
+                continue
+
+            by_name = {
+                str(item.get("candidate_name", "")): item
+                for item in raw_results
+                if isinstance(item, dict)
+            }
+
+            final_results: List[dict] = []
+            for resume in resumes:
+                name = resume["candidate_name"]
+                item = by_name.get(name)
+                if not item:
+                    logger.warning("Batch score missing candidate '%s'.", name)
+                    continue
+
+                model_total = float(item.get("totalScore", -1))
+                if model_total == -2:
+                    continue  # content is not a resume
+                if not _scores_valid(item):
+                    logger.warning("Invalid category scores for '%s' in batch response.", name)
+                    continue
+
+                final_results.append(
+                    {
+                        "candidate_name": name,
+                        "total_score": _compute_total_score(item),
+                        "scores": item.get("scores", {}),
+                        "reasons": item.get("scoringReasons", {}),
+                    }
+                )
+
+            return final_results
         except Exception as e:
-            logger.warning("Score attempt %d failed: %s", attempt + 1, e)
-    return None
+            logger.warning("Batch scoring attempt %d failed: %s", attempt + 1, e)
+
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -134,8 +199,8 @@ def rank_resumes(
     Rank resumes against a job description.
 
     Two-stage pipeline:
-      Stage 1 — hybrid search + search-score aggregation → top 25 candidates (fast, free)
-      Stage 2 — ThreadPoolExecutor with up to 8 parallel GPT-4o scoring calls (capped at 15)
+            Stage 1 — hybrid search + search-score aggregation (fast, free)
+            Stage 2 — batched GPT-4o scoring of top 15 candidates (5 resumes per call)
 
     GPT-4o calls are always capped at ~15 regardless of how many resumes are in the corpus,
     so this stays fast at 1000+ resumes.
@@ -189,8 +254,9 @@ def rank_resumes(
         len(coarse_candidates),
     )
 
-    # Stage 2 — parallel GPT-4o scoring of top 15
-    def _score_one(name: str) -> Optional[dict]:
+    # Stage 2 — batched GPT-4o scoring (5 resumes per call)
+    resume_payloads: List[dict] = []
+    for name in coarse_candidates:
         try:
             # Prefer the cached parsed-text blob (fast blob read, no index query needed)
             resume_text = fetch_parsed_text(name)
@@ -198,30 +264,25 @@ def rank_resumes(
             # Fallback: reconstruct from search index chunks (for resumes uploaded before this refactor)
             logger.warning("Parsed-text blob missing for '%s', falling back to index reconstruction.", name)
             resume_text = resume_search.get_document_text(name)
+        resume_payloads.append({"candidate_name": name, "resume_text": resume_text})
 
-        result = score_resume(jd_text, resume_text)
-        if result is None:
-            return None
-        total_score = _compute_total_score(result)
-        return {
-            "candidate_name": name,
-            "total_score": total_score,
-            "scores": result.get("scores", {}),
-            "reasons": result.get("scoringReasons", {}),
-        }
+    batches = [
+        resume_payloads[i: i + BATCH_SCORE_SIZE]
+        for i in range(0, len(resume_payloads), BATCH_SCORE_SIZE)
+    ]
 
     ranked: List[dict] = []
     completed = 0
-    total = len(coarse_candidates)
-    # max_workers=8: balances Azure OpenAI TPM limits with parallelism gains
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(_score_one, name): name for name in coarse_candidates}
+    total = len(resume_payloads)
+    # Parallelize by batch to keep call count low and throughput high.
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {executor.submit(score_resumes_batch, jd_text, batch): batch for batch in batches}
         for future in as_completed(futures):
-            result = future.result()
-            completed += 1
+            batch = futures[future]
+            batch_results = future.result() or []
+            completed += len(batch)
             _p(f"Scored {completed} / {total} resumes…")
-            if result is not None:
-                ranked.append(result)
+            ranked.extend(batch_results)
 
     ranked.sort(key=lambda x: -x["total_score"])
     logger.info("Scoring complete. Returning top %d of %d.", top_n, len(ranked))
