@@ -13,10 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import List, Optional
 
-from ResumeRankerMCP.common.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
-from ResumeRankerMCP.common.config import get_score_system, get_score_max
-from ResumeRankerMCP.common.models import RankedCandidate
-from ResumeRankerMCP.common.storage import fetch_parsed_text
+from src.common.clients import get_openai_client, get_resume_search, OPENAI_DEPLOYMENT
+from src.common.config import get_score_system, get_score_max
+from src.common.models import RankedCandidate
+from src.common.storage import fetch_parsed_text
 
 logger = logging.getLogger(__name__)
 BATCH_SCORE_SIZE = 5

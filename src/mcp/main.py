@@ -1,6 +1,6 @@
 """Compatibility launcher for the MCP server."""
 
-from ResumeRankerMCP.mcp.server import main
+from src.mcp.server import main
 
 
 if __name__ == "__main__":

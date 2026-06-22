@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
-from ResumeRankerMCP.common.clients import get_blob_service
+from src.common.clients import get_blob_service
 
 load_dotenv()
 
@@ -43,7 +43,7 @@ def get_blob_url(container: str, name: str, expiry_minutes: int = 60) -> str:
     - DOCX / DOC → Microsoft Office Online viewer wrapping the SAS URL (no local install needed).
     - Other      → plain SAS URL (browser default behaviour).
     """
-    from ResumeRankerMCP.common.clients import STORAGE_CONN_STR
+    from src.common.clients import STORAGE_CONN_STR
     parts = {}
     for segment in STORAGE_CONN_STR.split(";"):
         if "=" in segment:

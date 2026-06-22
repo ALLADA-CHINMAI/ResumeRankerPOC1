@@ -9,17 +9,17 @@ import sys
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 
-from ResumeRankerMCP.common.clients import (
+from src.common.clients import (
     OPENAI_DEPLOYMENT,
     get_blob_service,
     get_openai_client,
     get_resume_search,
     validate_config,
 )
-from ResumeRankerMCP.common.models import SkillGapAnalysis
-from ResumeRankerMCP.common.ranking import rank_resumes
-from ResumeRankerMCP.common.storage import fetch_parsed_text
-from ResumeRankerMCP.mcp.server_config import configure_logging
+from src.common.models import SkillGapAnalysis
+from src.common.ranking import rank_resumes
+from src.common.storage import fetch_parsed_text
+from src.mcp.server_config import configure_logging
 
 KEYWORD_CONTAINER = os.getenv("JD_KEYWORDS_CONTAINER_NAME", "jds-keywords")
 

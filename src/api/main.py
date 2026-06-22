@@ -2,7 +2,7 @@
 REST API for ResumeRanker — exposes ranking functionality to external applications.
 
 Run locally:
-    uvicorn ResumeRankerMCP.api.main:app --host 0.0.0.0 --port 8000
+    uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 
 Endpoints:
     POST /rankResumes  — rank existing indexed resumes against a JD identified by req_id
@@ -15,10 +15,10 @@ import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from ResumeRankerMCP.common.models import RankedCandidate
-from ResumeRankerMCP.common.ranking import rank_resumes
-from ResumeRankerMCP.common.storage import JD_CONTAINER, RESUME_CONTAINER, get_blob_url
-from ResumeRankerMCP.common.clients import get_blob_service
+from src.common.models import RankedCandidate
+from src.common.ranking import rank_resumes
+from src.common.storage import JD_CONTAINER, RESUME_CONTAINER, get_blob_url
+from src.common.clients import get_blob_service
 
 app = FastAPI(title="ResumeRanker API", version="1.0.0")
 KEYWORD_CONTAINER = os.getenv("JD_KEYWORDS_CONTAINER_NAME", "jds-keywords")
